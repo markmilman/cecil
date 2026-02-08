@@ -44,6 +44,9 @@ select = [
 ]
 ignore = ["E501"]  # line length handled by formatter
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]  # assert is expected in test code
+
 [tool.ruff.lint.isort]
 known-first-party = ["cecil"]
 force-single-line = false
