@@ -323,3 +323,58 @@ def generate_sample_csv(path: str, count: int = 10) -> list[str]:
             pii_values.extend([pii.email, pii.name, pii.ssn, pii.phone])
 
     return pii_values
+
+
+def generate_sample_parquet(path: str, count: int = 10) -> list[str]:
+    """Write sample Parquet records to a file and return all PII values.
+
+    Creates a Parquet file with columns: email, name, ssn, phone, model,
+    tokens_in, tokens_out, cost_usd.  Uses PyArrow to write the file.
+
+    Args:
+        path: Filesystem path where the Parquet file will be written.
+        count: Number of data rows to write.
+
+    Returns:
+        A list of all PII values embedded in the generated file.
+    """
+    import pyarrow as pa  # type: ignore[import-untyped]
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
+
+    pii_values: list[str] = []
+    emails: list[str] = []
+    names: list[str] = []
+    ssns: list[str] = []
+    phones: list[str] = []
+    models: list[str] = []
+    tokens_in_list: list[int] = []
+    tokens_out_list: list[int] = []
+    cost_usd_list: list[float] = []
+
+    for i in range(count):
+        pii = KNOWN_PII_BUNDLES[i % len(KNOWN_PII_BUNDLES)]
+        emails.append(pii.email)
+        names.append(pii.name)
+        ssns.append(pii.ssn)
+        phones.append(pii.phone)
+        models.append("gpt-4")
+        tokens_in_list.append(45)
+        tokens_out_list.append(22)
+        cost_usd_list.append(0.0067)
+        pii_values.extend([pii.email, pii.name, pii.ssn, pii.phone])
+
+    table = pa.table(
+        {
+            "email": pa.array(emails, type=pa.string()),
+            "name": pa.array(names, type=pa.string()),
+            "ssn": pa.array(ssns, type=pa.string()),
+            "phone": pa.array(phones, type=pa.string()),
+            "model": pa.array(models, type=pa.string()),
+            "tokens_in": pa.array(tokens_in_list, type=pa.int64()),
+            "tokens_out": pa.array(tokens_out_list, type=pa.int64()),
+            "cost_usd": pa.array(cost_usd_list, type=pa.float64()),
+        },
+    )
+    pq.write_table(table, path)
+
+    return pii_values

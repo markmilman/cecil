@@ -11,7 +11,11 @@ from pathlib import Path
 
 import pytest
 
-from tests.fixtures.pii_samples import generate_sample_csv, generate_sample_jsonl
+from tests.fixtures.pii_samples import (
+    generate_sample_csv,
+    generate_sample_jsonl,
+    generate_sample_parquet,
+)
 
 
 @pytest.fixture()
@@ -86,4 +90,16 @@ def blank_lines_jsonl_path(tmp_path: Path) -> Path:
         "",
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+@pytest.fixture()
+def tmp_parquet_path(tmp_path: Path) -> Path:
+    """Create a temporary Parquet file with sample PII records.
+
+    Returns:
+        Path to a temporary Parquet file containing 5 records.
+    """
+    path = tmp_path / "sample.parquet"
+    generate_sample_parquet(str(path), count=5)
     return path
