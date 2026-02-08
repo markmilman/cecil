@@ -1,0 +1,6 @@
+email,name,ssn,phone,model,tokens_in,tokens_out,cost_usd,address,ip_address
+john.doe@example.com,John Doe,123-45-6789,(555) 867-5309,gpt-4,45,22,0.0067,"123 Main Street, Springfield, IL 62701",192.168.1.42
+jane.smith@testmail.org,Jane Smith,987-65-4321,+1-202-555-0173,claude-3,38,18,0.0042,"456 Oak Avenue, Portland, OR 97201",10.0.0.99
+bob.wilson@corporate.net,Bob Wilson,456-78-9012,(312) 555-0198,gpt-4,32,15,0.0035,"789 Pine Road, Chicago, IL 60601",172.16.254.1
+john.doe@example.com,John Doe,123-45-6789,(555) 867-5309,gpt-4,28,10,0.0028,"123 Main Street, Springfield, IL 62701",192.168.1.42
+jane.smith@testmail.org,Jane Smith,987-65-4321,+1-202-555-0173,claude-3,22,12,0.0025,"456 Oak Avenue, Portland, OR 97201",10.0.0.99
