@@ -6,7 +6,6 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
-*~
 
 # Editor and IDE Files
 .vscode/
@@ -54,6 +53,8 @@ htmlcov/
 .tox/
 .hypothesis/
 .pytype/
+.mypy_cache/
+.ruff_cache/
 venv/
 env/
 ENV/
@@ -71,52 +72,17 @@ yarn-error.log*
 *.tgz
 .yarn-integrity
 
-# Java
-*.class
-*.log
-*.jar
-*.war
-*.nar
-*.ear
-*.zip
-*.tar.gz
-*.rar
-hs_err_pid*
-target/
-.gradle/
-build/
-.gradletasknamecache
-
-# Rust
-target/
-Cargo.lock
-**/*.rs.bk
-
-# Go
+# Binary / Build Artifacts
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-*.test
+*.bin
 *.out
-vendor/
-
-# Ruby
-*.gem
-*.rbc
-/.config
-/coverage/
-/InstalledFiles
-/pkg/
-/spec/reports/
-/spec/examples.txt
-/test/tmp/
-/test/version_tmp/
-/tmp/
-/.bundle/
-/vendor/bundle
-lib/bundler/man/
+*.com
+*.class
+*.o
 
 # Environment and Secrets
 .env
@@ -136,24 +102,11 @@ credentials.json
 # Logs
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
 
 # Database
-*.sql
 *.sqlite
 *.sqlite3
 *.db
-
-# Compiled files
-*.com
-*.class
-*.dll
-*.exe
-*.o
-*.so
 
 # Temporary files
 tmp/
