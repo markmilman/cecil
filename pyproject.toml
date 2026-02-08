@@ -15,6 +15,9 @@ dependencies = [
     "pydantic>=2.7.0",
 ]
 
+[project.scripts]
+cecil = "cecil.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "ruff>=0.4.0",
