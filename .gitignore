@@ -44,6 +44,7 @@ wheels/
 MANIFEST
 *.manifest
 *.spec
+!cecil.spec
 pip-log.txt
 pip-delete-this-directory.txt
 .pytest_cache/
@@ -60,6 +61,9 @@ env/
 ENV/
 env.bak/
 venv.bak/
+
+# Cecil build artifacts
+src/cecil/ui_dist/
 
 # Node.js
 node_modules/

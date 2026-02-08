@@ -13,6 +13,7 @@ from cecil.utils.errors import (
     TelemetryBlockedError,
     TelemetryError,
 )
+from cecil.utils.paths import get_base_path, get_resource_path, get_ui_dist_path, is_frozen
 
 
 __all__ = [
@@ -25,4 +26,8 @@ __all__ = [
     "SanitizationError",
     "TelemetryBlockedError",
     "TelemetryError",
+    "get_base_path",
+    "get_resource_path",
+    "get_ui_dist_path",
+    "is_frozen",
 ]
