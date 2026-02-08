@@ -11,12 +11,14 @@ import logging
 from typing import Any
 
 from cecil.core.providers.base import BaseDataProvider
+from cecil.core.providers.local_file import LocalFileProvider
 from cecil.core.providers.mock import MockDataProvider
 
 
 logger = logging.getLogger(__name__)
 
 PROVIDER_REGISTRY: dict[str, type[BaseDataProvider]] = {
+    "local_file": LocalFileProvider,
     "mock": MockDataProvider,
 }
 
