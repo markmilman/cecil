@@ -82,3 +82,9 @@ omit = ["tests/*", "scripts/*"]
 [tool.coverage.report]
 fail_under = 80
 show_missing = true
+
+# ── Bandit ─────────────────────────────────────────────────────────────
+[tool.bandit]
+targets = ["src/cecil"]
+exclude_dirs = ["tests", "scripts"]
+skips = ["B101"]  # allow assert in non-production code
