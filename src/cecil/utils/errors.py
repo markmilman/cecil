@@ -53,3 +53,14 @@ class TelemetryError(CecilError):
 
 class TelemetryBlockedError(TelemetryError):
     """Telemetry was blocked by policy (e.g., Audit mode or PII detected)."""
+
+
+# ── IPC / Server stage ────────────────────────────────────────────────
+
+
+class ServerError(CecilError):
+    """Errors related to the local IPC server."""
+
+
+class ServerStartupError(ServerError):
+    """The FastAPI/Uvicorn server failed to start or become ready."""
