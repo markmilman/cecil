@@ -212,7 +212,7 @@ def run_scan(args: argparse.Namespace) -> int:
 
             output_path = _resolve_output_path(source_path, args.output, fmt)
 
-            # TODO(#XX): Wire sanitization engine -- pass-through mode is temporary
+            # TODO(#65): Wire sanitization engine -- pass-through mode is temporary
             records = provider.stream_records()
 
             if fmt == "jsonl":
