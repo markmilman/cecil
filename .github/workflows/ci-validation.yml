@@ -56,22 +56,14 @@ jobs:
       - name: Mypy strict type check
         run: mypy --strict src/cecil/
 
-      - name: Check for test files
-        id: check-tests
-        run: |
-          if find tests/ -name 'test_*.py' -not -empty | grep -q .; then
-            echo "has_tests=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_tests=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Run pytest with coverage
-        if: steps.check-tests.outputs.has_tests == 'true'
-        run: pytest --cov=cecil --cov-report=term-missing --cov-fail-under=80
-
-      - name: Skip notice (no tests yet)
-        if: steps.check-tests.outputs.has_tests == 'false'
-        run: echo "::notice::No test files found — skipping pytest. Coverage gate will apply once tests are added."
+        run: |
+          COLLECTED=$(pytest --collect-only -q 2>/dev/null | tail -1 || true)
+          if echo "$COLLECTED" | grep -qE '^[1-9][0-9]* tests?'; then
+            pytest --cov=cecil --cov-report=term-missing --cov-fail-under=80
+          else
+            echo "::notice::No tests collected — skipping coverage gate."
+          fi
 
   # ---------------------------------------------------------------------------
   # Job 2: Frontend lint + test (Issue #15)
