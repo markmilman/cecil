@@ -15,7 +15,6 @@ from cecil.core.providers.local_file import LocalFileProvider
 from cecil.utils.errors import (
     ProviderConnectionError,
     ProviderDependencyError,
-    ProviderReadError,
 )
 
 
@@ -101,6 +100,64 @@ class TestLocalFileProviderConnect:
         monkeypatch.setattr(os, "access", lambda p, m: False)
         provider = LocalFileProvider(file_path=path)
         with pytest.raises(ProviderConnectionError, match="not readable"):
+            provider.connect()
+
+    def test_connect_raises_for_empty_file(self, tmp_path: Path) -> None:
+        """Zero-byte file is rejected at connect time."""
+        path = tmp_path / "empty.jsonl"
+        path.write_text("", encoding="utf-8")
+        provider = LocalFileProvider(file_path=path)
+        with pytest.raises(ProviderConnectionError, match=r"empty.*zero bytes"):
+            provider.connect()
+
+    def test_connect_validates_jsonl_content(self, tmp_path: Path) -> None:
+        """A .jsonl file with non-JSON content is rejected at connect."""
+        path = tmp_path / "bad.jsonl"
+        path.write_text("this is not json\nanother line\n", encoding="utf-8")
+        provider = LocalFileProvider(file_path=path)
+        with pytest.raises(
+            ProviderConnectionError,
+            match="does not appear to be valid JSONL",
+        ):
+            provider.connect()
+
+    def test_connect_validates_csv_content(self, tmp_path: Path) -> None:
+        """A .csv file that is actually a binary blob is rejected."""
+        path = tmp_path / "bad.csv"
+        # Build binary content with null bytes to simulate a PNG file
+        binary_data = bytes([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        binary_data += bytes([0x00, 0x00, 0x00]) + b"binary content"
+        path.write_bytes(binary_data)
+        provider = LocalFileProvider(file_path=path)
+        with pytest.raises(
+            ProviderConnectionError,
+            match="does not appear to be valid CSV",
+        ):
+            provider.connect()
+
+    def test_connect_validates_parquet_content(self, tmp_path: Path) -> None:
+        """A .parquet file without PAR1 magic bytes is rejected."""
+        path = tmp_path / "bad.parquet"
+        path.write_bytes(b"NOT_PARQUET_DATA_HERE")
+        provider = LocalFileProvider(file_path=path)
+        with pytest.raises(
+            ProviderConnectionError,
+            match="missing PAR1 magic bytes",
+        ):
+            provider.connect()
+
+    def test_format_mismatch_jsonl_extension_csv_content(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """A .jsonl file containing CSV content is detected and rejected."""
+        path = tmp_path / "mismatch.jsonl"
+        path.write_text("name,age,city\nAlice,30,Portland\n", encoding="utf-8")
+        provider = LocalFileProvider(file_path=path)
+        with pytest.raises(
+            ProviderConnectionError,
+            match="does not appear to be valid JSONL",
+        ):
             provider.connect()
 
 
@@ -190,23 +247,17 @@ class TestLocalFileProviderStreamJSONL:
         assert records[0] == {"id": 1}
         assert records[1] == {"id": 2}
 
-    def test_stream_records_on_empty_file(self, empty_jsonl_path: Path) -> None:
-        with LocalFileProvider(file_path=empty_jsonl_path) as provider:
-            records = list(provider.stream_records())
-        assert records == []
-
-    def test_stream_records_raises_on_malformed_json(
+    def test_stream_jsonl_skips_malformed_records(
         self,
         malformed_jsonl_path: Path,
     ) -> None:
+        """Malformed JSON lines are skipped, not raised."""
         with LocalFileProvider(file_path=malformed_jsonl_path) as provider:
-            gen = provider.stream_records()
-            # First two records are valid
-            next(gen)
-            next(gen)
-            # Third line is invalid
-            with pytest.raises(ProviderReadError, match="Invalid JSON on line 3"):
-                next(gen)
+            records = list(provider.stream_records())
+        # Two valid records out of three lines
+        assert len(records) == 2
+        assert records[0] == {"id": 1, "value": "ok"}
+        assert records[1] == {"id": 2, "value": "also ok"}
 
     def test_stream_records_preserves_record_data(self, tmp_path: Path) -> None:
         path = tmp_path / "precise.jsonl"
@@ -248,7 +299,7 @@ class TestLocalFileProviderStreamCSV:
         self,
         tmp_path: Path,
     ) -> None:
-        """TSV file with delimiter='\t' is read correctly."""
+        """TSV file with delimiter=tab is read correctly."""
         path = tmp_path / "data.csv"
         path.write_text(
             "name\tage\tcity\nAlice\t30\tPortland\nBob\t25\tChicago\n",
@@ -308,6 +359,18 @@ class TestLocalFileProviderStreamCSV:
             # Should not raise NotImplementedError
             records = list(provider.stream_records())
         assert len(records) > 0
+
+    def test_stream_csv_skips_malformed_records(self, tmp_path: Path) -> None:
+        """Badly formed CSV rows are handled gracefully."""
+        path = tmp_path / "bad_csv.csv"
+        # Write a valid header then a row with mismatched fields
+        content = "name,age,city\nAlice,30,Portland\n,,,extra,too_many\nBob,25,Chicago\n"
+        path.write_text(content, encoding="utf-8")
+        with LocalFileProvider(file_path=path) as provider:
+            records = list(provider.stream_records())
+        # Alice and Bob should be present
+        assert any(r.get("name") == "Alice" for r in records)
+        assert any(r.get("name") == "Bob" for r in records)
 
 
 # -- stream_records() unsupported formats ----------------------------------
@@ -413,6 +476,111 @@ class TestLocalFileProviderStreamParquet:
             meta = provider.fetch_metadata()
         assert meta["record_count"] == 5
         assert meta["format"] == "parquet"
+
+
+# -- Quarantine logging ----------------------------------------------------
+
+
+class TestLocalFileProviderQuarantine:
+    """Verify quarantine log behavior for malformed records."""
+
+    def test_stream_jsonl_quarantine_writes_record(
+        self,
+        malformed_jsonl_path: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Quarantine log file contains an entry for each bad record."""
+        quarantine = tmp_path / "quarantine.jsonl"
+        provider = LocalFileProvider(
+            file_path=malformed_jsonl_path,
+            quarantine_path=quarantine,
+        )
+        with provider:
+            list(provider.stream_records())
+
+        assert quarantine.exists()
+        entries = [
+            json.loads(line) for line in quarantine.read_text(encoding="utf-8").strip().split("\n")
+        ]
+        assert len(entries) == 1
+        entry = entries[0]
+        assert entry["line_number"] == 3
+        assert entry["error_type"] == "JSONDecodeError"
+        assert "timestamp" in entry
+        assert entry["source_file"] == str(malformed_jsonl_path)
+
+    def test_stream_jsonl_quarantine_no_pii(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Quarantine log must NOT contain any raw data or PII values."""
+        path = tmp_path / "pii.jsonl"
+        pii_email = "secret@example.com"
+        pii_ssn = "123-45-6789"
+        lines_data = [
+            json.dumps({"email": pii_email, "id": 1}),
+            '{"bad json with PII ' + pii_email + " and SSN " + pii_ssn,
+            json.dumps({"email": "other@example.com", "id": 2}),
+        ]
+        path.write_text("\n".join(lines_data) + "\n", encoding="utf-8")
+
+        quarantine = tmp_path / "quarantine.jsonl"
+        provider = LocalFileProvider(
+            file_path=path,
+            quarantine_path=quarantine,
+        )
+        with provider:
+            list(provider.stream_records())
+
+        quarantine_text = quarantine.read_text(encoding="utf-8")
+        # No PII should appear in quarantine
+        assert pii_email not in quarantine_text
+        assert pii_ssn not in quarantine_text
+        # But the structural metadata should be there
+        entry = json.loads(quarantine_text.strip())
+        assert entry["line_number"] == 2
+        assert entry["error_type"] == "JSONDecodeError"
+
+    def test_quarantine_disabled_by_default(
+        self,
+        malformed_jsonl_path: Path,
+        tmp_path: Path,
+    ) -> None:
+        """When no quarantine_path is given, no quarantine file is created."""
+        quarantine = tmp_path / "should_not_exist.jsonl"
+        provider = LocalFileProvider(file_path=malformed_jsonl_path)
+        with provider:
+            list(provider.stream_records())
+
+        assert not quarantine.exists()
+
+    def test_metadata_includes_quarantined_count(
+        self,
+        malformed_jsonl_path: Path,
+        tmp_path: Path,
+    ) -> None:
+        """fetch_metadata() includes records_quarantined after streaming."""
+        quarantine = tmp_path / "quarantine.jsonl"
+        provider = LocalFileProvider(
+            file_path=malformed_jsonl_path,
+            quarantine_path=quarantine,
+        )
+        with provider:
+            list(provider.stream_records())
+            meta = provider.fetch_metadata()
+
+        assert meta["records_quarantined"] == 1
+        assert meta["record_count"] == 2
+
+    def test_metadata_quarantined_count_zero_by_default(
+        self,
+        tmp_jsonl_path: Path,
+    ) -> None:
+        """records_quarantined is zero when no malformed records exist."""
+        with LocalFileProvider(file_path=tmp_jsonl_path) as provider:
+            list(provider.stream_records())
+            meta = provider.fetch_metadata()
+        assert meta["records_quarantined"] == 0
 
 
 # -- fetch_metadata() ------------------------------------------------------
