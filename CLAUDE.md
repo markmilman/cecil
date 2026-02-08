@@ -198,6 +198,13 @@ Full details in `docs/STYLE_GUIDE.md` §3.
 - **PRs**: squash-merge into `main`; require CI pass + approval; title matches commit format
 - **GitHub Issues**: Use **sub-issues** for task breakdowns — never use markdown task checklists (`- [ ]`) in issue bodies. Create each task as a separate sub-issue linked to the parent via the GitHub sub-issues API (`addSubIssue` GraphQL mutation). Parent issues should contain only the description, assignment, dependencies, and status.
 
+## Post-Task Checklist
+
+After completing each task (issue), you **must** perform these steps before considering it done:
+
+1. **Verify CI pipeline**: After pushing or creating a PR, check that the GitHub Actions CI pipeline passes (`gh pr checks <number>` or `gh run list`). If any job fails, investigate the logs (`gh run view <id> --log-failed`), fix the issue, and push again. Do not leave a PR with failing CI.
+2. **Update GitHub issue status**: Close the relevant GitHub issue when the PR is merged, or add a comment noting the PR number and current status. Use `gh issue close <number>` after merge confirmation, or `gh issue comment <number> --body "..."` for status updates.
+
 ## API Design
 
 - All endpoints under `/api/v1/` (versioned)

@@ -62,9 +62,9 @@ def test_stream_records_with_10mb_input_stays_under_memory_bound():
     tracemalloc.stop()
 
     assert count == 10_000
-    assert (
-        peak < MEMORY_CEILING_BYTES
-    ), f"Peak memory {peak / 1024 / 1024:.1f} MB exceeds 50 MB bound"
+    assert peak < MEMORY_CEILING_BYTES, (
+        f"Peak memory {peak / 1024 / 1024:.1f} MB exceeds 50 MB bound"
+    )
 
 
 def test_stream_records_with_50mb_input_stays_under_memory_bound():
@@ -88,6 +88,6 @@ def test_stream_records_with_50mb_input_stays_under_memory_bound():
     tracemalloc.stop()
 
     assert count == 50_000
-    assert (
-        peak < MEMORY_CEILING_BYTES
-    ), f"Peak memory {peak / 1024 / 1024:.1f} MB exceeds 50 MB bound"
+    assert peak < MEMORY_CEILING_BYTES, (
+        f"Peak memory {peak / 1024 / 1024:.1f} MB exceeds 50 MB bound"
+    )
