@@ -79,6 +79,11 @@ class TestScanRequest:
         with pytest.raises(ValidationError):
             ScanRequest(source="")
 
+    def test_scan_request_rejects_whitespace_only_source(self) -> None:
+        """ScanRequest rejects whitespace-only source string."""
+        with pytest.raises(ValidationError):
+            ScanRequest(source="   ")
+
     def test_scan_request_defaults_provider_id_to_local_file(self) -> None:
         """ScanRequest defaults provider_id to 'local_file'."""
         request = ScanRequest(source="/path/to/file.jsonl")
@@ -117,6 +122,17 @@ class TestScanRequest:
 
 class TestScanResponse:
     """Tests for ScanResponse schema."""
+
+    def test_scan_response_defaults_records_processed_to_zero(self) -> None:
+        """ScanResponse defaults records_processed to 0."""
+        response = ScanResponse(
+            scan_id="550e8400-e29b-41d4-a716-446655440000",
+            status=ScanStatus.COMPLETED,
+            source="/path/to/file.jsonl",
+            file_format=FileFormat.JSONL,
+            created_at=datetime.now(UTC),
+        )
+        assert response.records_processed == 0
 
     def test_scan_response_serializes_errors_as_list(self) -> None:
         """ScanResponse serializes errors as a list."""
@@ -199,6 +215,7 @@ class TestScanResponse:
         assert data["records_processed"] == 100
         assert data["records_redacted"] == 15
         assert data["errors"] == ["Warning: skipped malformed line"]
+        assert data["created_at"] == created_at
 
 
 class TestScanProgress:
