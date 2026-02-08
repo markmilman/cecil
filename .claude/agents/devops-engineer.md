@@ -61,7 +61,7 @@ You implement sub-issues assigned to the `devops-engineer` role. For each sub-is
 
 1. Read the sub-issue to understand the goal, files affected, dependencies, and verification criteria
 2. Ensure all dependency sub-issues are already closed before starting
-3. Create a feature branch from `main` (e.g., `feat/<sub-issue-slug>`)
+3. Create a child branch from the **feature branch** (not `main`): `feat/<sub-issue-slug>` from `feat/<story-slug>`
 4. Implement the change following all code standards in CLAUDE.md
 5. Write or update tests as specified in the verification criteria
 6. Run verification:
@@ -70,7 +70,7 @@ You implement sub-issues assigned to the `devops-engineer` role. For each sub-is
    cd ui && npm run lint && npm test
    ```
 7. Commit with a message referencing the sub-issue: `ci(build): description (closes #<sub-issue-number>)`
-8. Push the branch and **submit for Tech Lead code review** before creating a PR
+8. Push the branch and **submit for Tech Lead code review**
 9. Address any review feedback from the Tech Lead — revise and re-submit until approved
-10. After Tech Lead approval, create a PR. Verify CI passes (`gh pr checks <number>`).
-11. After merge, close the sub-issue: `gh issue close <sub-issue-number>`
+10. After Tech Lead approval, **merge into the feature branch** (`feat/<story-slug>`)
+11. Close the sub-issue: `gh issue close <sub-issue-number>`

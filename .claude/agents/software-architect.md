@@ -73,4 +73,5 @@ After all sub-issues for a parent story are closed, you review the complete impl
    - **Implementation is wrong**: Direct the Tech Lead to create corrective sub-issues and have engineers fix the code
    - **Design needs updating**: Update the relevant documentation (`docs/detailed_design.md`, `docs/STYLE_GUIDE.md`, etc.) to reflect justified deviations
 5. Post your review as a comment on the **parent issue** with a `## Architecture Verification` heading
-6. Phase 5 reviewers (PM, QA, UX) should not begin until this verification is complete.
+6. Once verification passes, the feature branch is ready for Phase 5 review and ultimately a single PR to `main`.
+7. Phase 5 reviewers (PM, QA, UX) should not begin until this verification is complete.

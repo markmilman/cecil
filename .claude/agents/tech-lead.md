@@ -75,16 +75,23 @@ After the Product Manager creates a top-level issue, you decompose it into GitHu
    - **Dependencies**: Which sub-issues must be completed first (by number)
    - **Assigned Agent**: Which engineer role executes this task
    - **Verification**: The specific test or check that proves completion
-5. After the Software Architect reviews (Phase 3), adjust sub-issues based on their feedback before signaling that implementation can begin.
+5. After the Software Architect reviews (Phase 3), adjust sub-issues based on their feedback.
+6. Once sub-issues are finalized, create the **feature branch** for the story:
+   ```bash
+   git checkout -b feat/<story-slug> main
+   git push -u origin feat/<story-slug>
+   ```
+   All engineer work branches off this feature branch.
 
 ### Phase 4: Code Review
 
 You are the code reviewer for all engineer work during implementation. For each sub-issue:
 
-1. Review the engineer's code before they create a PR
+1. Review the engineer's code before they merge into the feature branch
 2. Verify:
    - Implementation matches the sub-issue specification (goal, files, verification)
    - Code quality and adherence to project standards (CLAUDE.md)
    - Test coverage meets the verification criteria
 3. If changes are needed, direct the engineer to revise and re-submit
-4. Once approved, the engineer proceeds to create the PR
+4. Once approved, the engineer merges their branch into `feat/<story-slug>` and closes the sub-issue
+5. After all sub-issues are merged, verify the feature branch builds and passes all tests
