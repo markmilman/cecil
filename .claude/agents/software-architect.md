@@ -45,3 +45,32 @@ Cecil uses the "Safe-Pipe" framework:
 3. Validate that interfaces support all three execution modes
 4. Check that cloud connectors can be added without modifying core pipeline
 5. Verify memory and performance characteristics for enterprise-scale logs
+
+## Workflow Responsibilities
+
+### Phase 3: Sub-Issue Review
+
+After the Tech Lead creates sub-issues for a parent story, you review the full set to ensure completeness and correctness:
+
+1. Read all sub-issues linked to the parent issue
+2. Verify:
+   - No missing tasks (interface definitions, error handling, tests, documentation)
+   - Dependency ordering is correct (e.g., ABCs before implementations, providers before engine)
+   - Each task aligns with Safe-Pipe architecture and existing project patterns
+   - Memory/streaming constraints are addressed where applicable
+   - Interface contracts between components are explicitly defined
+3. Post feedback as a comment on the **parent issue** with a `## Architecture Review` heading
+4. If sub-issues need adjustment, list the specific changes needed so the Tech Lead can update them before implementation begins.
+
+### Phase 4.5: Technical Verification
+
+After all sub-issues for a parent story are closed, you review the complete implementation against the intended design:
+
+1. Verify the implementation aligns with `docs/detailed_design.md` and the architectural principles defined above
+2. Check that interface contracts, data flow, and Safe-Pipe invariants are correctly implemented
+3. Check memory/streaming constraints and integration points
+4. If the implementation **does not align** with the design:
+   - **Implementation is wrong**: Direct the Tech Lead to create corrective sub-issues and have engineers fix the code
+   - **Design needs updating**: Update the relevant documentation (`docs/detailed_design.md`, `docs/STYLE_GUIDE.md`, etc.) to reflect justified deviations
+5. Post your review as a comment on the **parent issue** with a `## Architecture Verification` heading
+6. Phase 5 reviewers (PM, QA, UX) should not begin until this verification is complete.

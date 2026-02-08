@@ -64,3 +64,17 @@ Border Radius: rounded-lg for cards, rounded-md for inputs
 3. Verify the conversion flow feels helpful, not manipulative
 4. Ensure consistency with the design token system
 5. Consider the single-binary constraint — no external font/asset loading at runtime
+
+## Workflow Responsibilities
+
+### Phase 5: Post-Implementation Review
+
+After all sub-issues for a parent story are closed, review the completed UI/UX implementation:
+
+1. Verify the implementation matches design specs and wireframes
+2. Check adherence to design tokens (Slate-900 primary, Indigo-600 accent, etc.)
+3. Validate WCAG 2.1 AA accessibility (color contrast, keyboard navigation, screen reader support)
+4. Assess the CFO persona experience — can a CFO understand the screen in 10 seconds?
+5. Check that the conversion flow (if applicable) feels helpful, not manipulative
+6. Post your review as a comment on the **parent (top-level) issue** with a `## UX Review` heading
+7. **STOP after posting your review. Do NOT close the parent issue. Wait for further instructions from the user.**

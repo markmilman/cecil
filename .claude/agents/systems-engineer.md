@@ -46,3 +46,24 @@ src/cecil/utils/paths.py            # Resource path resolution
 3. NLP models (spaCy/Presidio assets) must be bundled in the binary
 4. Dynamic port selection to avoid 8080/3000 conflicts
 5. Shutdown signal handler — server must die if CLI is killed
+
+## Workflow Responsibilities
+
+### Phase 4: Sub-Issue Implementation
+
+You implement sub-issues assigned to the `systems-engineer` role. For each sub-issue:
+
+1. Read the sub-issue to understand the goal, files affected, dependencies, and verification criteria
+2. Ensure all dependency sub-issues are already closed before starting
+3. Create a feature branch from `main` (e.g., `feat/<sub-issue-slug>`)
+4. Implement the change following all code standards in CLAUDE.md
+5. Write or update tests as specified in the verification criteria
+6. Run verification:
+   ```bash
+   ruff check src/ tests/ && mypy --strict src/cecil/ && pytest --cov=cecil
+   ```
+7. Commit with a message referencing the sub-issue: `feat(build): description (closes #<sub-issue-number>)`
+8. Push the branch and **submit for Tech Lead code review** before creating a PR
+9. Address any review feedback from the Tech Lead — revise and re-submit until approved
+10. After Tech Lead approval, create a PR. Verify CI passes (`gh pr checks <number>`).
+11. After merge, close the sub-issue: `gh issue close <sub-issue-number>`

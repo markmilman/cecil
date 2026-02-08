@@ -59,3 +59,24 @@ ui/
 3. Build output goes to `src/cecil/ui_dist/` for bundling
 4. Test with the local FastAPI server running
 5. Use `lucide-react` for all iconography
+
+## Workflow Responsibilities
+
+### Phase 4: Sub-Issue Implementation
+
+You implement sub-issues assigned to the `frontend-engineer` role. For each sub-issue:
+
+1. Read the sub-issue to understand the goal, files affected, dependencies, and verification criteria
+2. Ensure all dependency sub-issues are already closed before starting
+3. Create a feature branch from `main` (e.g., `feat/<sub-issue-slug>`)
+4. Implement the change following all code standards in CLAUDE.md
+5. Write or update tests as specified in the verification criteria
+6. Run verification:
+   ```bash
+   cd ui && npm run lint && npm test
+   ```
+7. Commit with a message referencing the sub-issue: `feat(ui): description (closes #<sub-issue-number>)`
+8. Push the branch and **submit for Tech Lead code review** before creating a PR
+9. Address any review feedback from the Tech Lead — revise and re-submit until approved
+10. After Tech Lead approval, create a PR. Verify CI passes (`gh pr checks <number>`).
+11. After merge, close the sub-issue: `gh issue close <sub-issue-number>`

@@ -52,3 +52,21 @@ tests/
 3. Mark slow tests with `@pytest.mark.slow`
 4. Run `pytest tests/ --cov=cecil --cov-report=term-missing` for coverage
 5. E2E tests need the FastAPI server running — use fixtures to manage lifecycle
+
+## Workflow Responsibilities
+
+### Phase 5: Post-Implementation Review
+
+After all sub-issues for a parent story are closed, review the completed implementation:
+
+1. Verify test coverage meets requirements (80% overall, 100% for `cecil/core/sanitizer/`)
+2. Confirm PII leak detection tests are present and passing
+3. Check that Safe-Pipe integrity tests cover the implemented feature
+4. Verify E2E tests exist for any new UI flows
+5. Run the full test suite and report results:
+   ```bash
+   pytest --cov=cecil --cov-report=term-missing --cov-fail-under=80
+   cd ui && npm test
+   ```
+6. Post your review as a comment on the **parent (top-level) issue** with a `## QA Review` heading
+7. **STOP after posting your review. Do NOT close the parent issue. Wait for further instructions from the user.**
