@@ -77,7 +77,7 @@ This document outlines granular user stories for the Cecil hybrid solution. It f
 **User Story:** As an SOE, I want to launch a local Web UI to inspect a sample of the sanitized data so that I can verify that no PII "leaked" through the filters.
 
 * **Acceptance Criteria:**  
-  * \[ \] CLI command ai-sanitizer map launches a local FastAPI \+ React server.  
+  * \[ \] CLI command cecil map launches a local FastAPI \+ React server.  
   * \[ \] UI displays "Before vs After" comparison of redacted fields.  
   * \[ \] No data is sent to the cloud while in this audit mode.
 
@@ -96,7 +96,7 @@ This document outlines granular user stories for the Cecil hybrid solution. It f
 **User Story:** As a user, I want to receive a prompt after a successful local scan inviting me to get a free report so that I can realize the financial value of my logs.
 
 * **Acceptance Criteria:**  
-  * \[ \] Prints a clear terminal message: *"✅ Sanitization complete. Get your Free Cost Analysis PDF: Run ai-sanitizer report."*  
+  * \[ \] Prints a clear terminal message: *"✅ Sanitization complete. Get your Free Cost Analysis PDF: Run cecil report."*  
   * \[ \] Web UI displays a "Generate Report" button after audit verification.
 
 ### **US.10: Lead Capture & PDF Generation (SaaS Handshake)**

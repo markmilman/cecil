@@ -215,9 +215,9 @@ After completing each task (issue), you **must** perform these steps before cons
 
 ## CLI Commands
 
-- `ai-sanitizer` — main entry point
-- `ai-sanitizer map` — launches local FastAPI + React UI for mapping/audit
-- `ai-sanitizer report` — triggers cost analysis PDF generation (SaaS handshake)
+- `cecil` — main entry point
+- `cecil map` — launches local FastAPI + React UI for mapping/audit
+- `cecil report` — triggers cost analysis PDF generation (SaaS handshake)
 
 ## Sanitization Actions
 

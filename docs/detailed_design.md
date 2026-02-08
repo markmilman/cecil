@@ -35,7 +35,7 @@ The engine traverses data structures using a **Mapping Strategy**:
 The CLI prioritizes local utility to build trust:
 
 * **Immediate Local Output:** Upon completion of a scan, the CLI generates a sanitized version of the data in the user's preferred format (.jsonl, .csv) at a specified local path.  
-* **The "Value Gap" Notification:** After generating the local file, the CLI outputs a high-visibility terminal message:"✅ Sanitized data saved to ./sanitized\_logs.jsonl. 📊 Want to see how much you could save? Run ai-sanitizer report to get a Free Cost Analysis PDF from Cecil."  
+* **The "Value Gap" Notification:** After generating the local file, the CLI outputs a high-visibility terminal message:"✅ Sanitized data saved to ./sanitized\_logs.jsonl. 📊 Want to see how much you could save? Run cecil report to get a Free Cost Analysis PDF."  
 * **The Conversion Button (Mapping UI):** In the Web-based mapping interface, a prominent button labeled **"Generate Free Cost Analysis Report"** appears once the local sanitization preview is approved.
 
 ## **3\. Real-World Use Cases & Simulations**

@@ -1,6 +1,6 @@
 """Post-build verification script for the Cecil binary.
 
-Performs smoke tests on a built ``ai-sanitizer`` binary to confirm that
+Performs smoke tests on a built ``cecil`` binary to confirm that
 it was packaged correctly and can start up:
 
   1. Checks the binary exists in ``dist/``.
@@ -27,7 +27,7 @@ from pathlib import Path
 # ── Constants ─────────────────────────────────────────────────────────────
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
-DEFAULT_BINARY_NAME: str = "ai-sanitizer.exe" if platform.system() == "Windows" else "ai-sanitizer"
+DEFAULT_BINARY_NAME: str = "cecil.exe" if platform.system() == "Windows" else "cecil"
 DEFAULT_BINARY_PATH: Path = PROJECT_ROOT / "dist" / DEFAULT_BINARY_NAME
 
 logging.basicConfig(
@@ -136,7 +136,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         Parsed argument namespace.
     """
     parser = argparse.ArgumentParser(
-        description="Verify a built Cecil (ai-sanitizer) binary",
+        description="Verify a built Cecil binary",
     )
     parser.add_argument(
         "--binary",

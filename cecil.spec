@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec file for the Cecil (ai-sanitizer) single binary.
+"""PyInstaller spec file for the Cecil single binary.
 
 This spec bundles:
   - The Python CLI entry point (src/cecil/cli/__init__.py)
@@ -102,7 +102,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="ai-sanitizer",
+    name="cecil",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
