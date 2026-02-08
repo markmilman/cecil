@@ -59,3 +59,39 @@ Define sequencing — which tasks can run in parallel and which are blockers.
 
 ### 4. Verification Plan
 For each task, specify the concrete test or check that proves it's done.
+
+## Workflow Responsibilities
+
+### Phase 2: Task Breakdown via Sub-Issues
+
+After the Product Manager creates a top-level issue, you decompose it into GitHub **sub-issues**:
+
+1. Read the parent issue and cross-reference with `docs/detailed_design.md` and `docs/user_stories.md`
+2. Create one sub-issue per atomic task (2–4 hours each) via `gh issue create`
+3. Link each sub-issue to the parent using the GitHub sub-issues API (`addSubIssue` GraphQL mutation)
+4. Each sub-issue body must contain:
+   - **Goal**: What is being built
+   - **Files Affected**: Modules or directories involved
+   - **Dependencies**: Which sub-issues must be completed first (by number)
+   - **Assigned Agent**: Which engineer role executes this task
+   - **Verification**: The specific test or check that proves completion
+5. After the Software Architect reviews (Phase 3), adjust sub-issues based on their feedback.
+6. Once sub-issues are finalized, create the **feature branch** for the story:
+   ```bash
+   git checkout -b feat/<story-slug> main
+   git push -u origin feat/<story-slug>
+   ```
+   All engineer work branches off this feature branch.
+
+### Phase 4: Code Review
+
+You are the code reviewer for all engineer work during implementation. For each sub-issue:
+
+1. Review the engineer's code before they merge into the feature branch
+2. Verify:
+   - Implementation matches the sub-issue specification (goal, files, verification)
+   - Code quality and adherence to project standards (CLAUDE.md)
+   - Test coverage meets the verification criteria
+3. If changes are needed, direct the engineer to revise and re-submit
+4. Once approved, the engineer merges their branch into `feat/<story-slug>` and closes the sub-issue
+5. After all sub-issues are merged, verify the feature branch builds and passes all tests

@@ -198,12 +198,111 @@ Full details in `docs/STYLE_GUIDE.md` §3.
 - **PRs**: squash-merge into `main`; require CI pass + approval; title matches commit format
 - **GitHub Issues**: Use **sub-issues** for task breakdowns — never use markdown task checklists (`- [ ]`) in issue bodies. Create each task as a separate sub-issue linked to the parent via the GitHub sub-issues API (`addSubIssue` GraphQL mutation). Parent issues should contain only the description, assignment, dependencies, and status.
 
+## Development Workflow
+
+The project follows a structured, GitHub-driven lifecycle. Each phase has a responsible role and produces specific GitHub artifacts.
+
+### Phase 1: Story Creation (Product Manager)
+
+The Product Manager creates a **top-level GitHub issue** for each user story.
+
+- Issue body contains: user story ("As a... I want... So that..."), acceptance criteria, and technical constraints
+- No task checklists (`- [ ]`) in the issue body — tasks are always sub-issues
+- Assign appropriate labels (e.g., `epic:core`, `epic:frontend`, `epic:quality`)
+
+### Phase 2: Task Breakdown (Tech Lead)
+
+The Tech Lead decomposes each top-level issue into **sub-issues** — one per atomic engineering task (2–4 hours each).
+
+- Create sub-issues via `gh issue create`, then link to the parent using the `addSubIssue` GraphQL mutation
+- Each sub-issue includes: goal, files affected, dependencies (by sub-issue number), assigned agent role, and verification criteria
+- After sub-issues are finalized and architect-approved (Phase 3), create a **feature branch** for the story: `feat/<story-slug>` from `main`. All engineer work branches off this feature branch.
+
+### Phase 3: Architecture Review (Software Architect)
+
+The Software Architect reviews the full set of sub-issues for a parent story to verify:
+
+- No missing tasks (interface contracts, error handling, tests)
+- Correct sequencing and dependency declarations
+- Alignment with Safe-Pipe architecture and project patterns
+
+Feedback is posted as a comment on the **parent issue**. The Tech Lead adjusts sub-issues based on feedback before implementation begins.
+
+### Phase 4: Implementation (Engineers + Tech Lead Code Review)
+
+Engineers (backend-engineer, frontend-engineer, systems-engineer, devops-engineer) execute sub-issues. For each sub-issue:
+
+1. Verify dependency sub-issues are closed before starting
+2. Create a child branch from the **feature branch** (not `main`): `feat/<sub-issue-slug>` from `feat/<story-slug>`
+3. Implement the change following project code standards
+4. Run the verification step defined in the sub-issue
+5. Commit referencing the sub-issue: `feat(scope): description (closes #<sub-issue-number>)`
+6. Push the branch and **request a code review from the Tech Lead**
+
+The **Tech Lead** reviews the code for each sub-issue:
+
+- Verify the implementation matches the sub-issue specification
+- Check code quality, adherence to project standards, and test coverage
+- If changes are needed, direct the engineer to revise and re-submit
+- Once approved, the engineer **merges their branch into the feature branch** and closes the sub-issue
+
+### Phase 4.5: Technical Verification (Software Architect)
+
+After **all sub-issues** for a parent story are closed, the Software Architect reviews the complete implementation to verify alignment with the intended architecture and design:
+
+- Verify the implementation matches the designs in `docs/detailed_design.md` and architectural principles
+- Check that interface contracts, data flow, and Safe-Pipe invariants are correctly implemented
+- Check memory/streaming constraints and integration points
+
+If the implementation **does not align** with the design:
+
+1. **Implementation is wrong**: Direct the Tech Lead to create corrective sub-issues and have engineers fix the code
+2. **Design needs updating**: Update the relevant documentation (`docs/detailed_design.md`, `docs/STYLE_GUIDE.md`, etc.) to reflect justified deviations
+
+Post the review as a comment on the **parent issue** with a `## Architecture Verification` heading. Once verification passes, the feature branch is ready for Phase 5 review.
+
+### Phase 5: Review (Product Manager, QA Engineer, UX Designer)
+
+After the Software Architect's verification is complete and any corrective work is done, the following roles review the completed work and post feedback as **comments on the parent (top-level) issue**:
+
+- **Product Manager**: Validates acceptance criteria are met, user story intent is fulfilled
+- **QA Engineer**: Verifies test coverage, PII leak detection, Safe-Pipe integrity
+- **UX Designer**: Reviews UI/UX implementation against design specs and accessibility standards
+
+**CRITICAL: Reviewers do NOT close the parent issue, create the PR to `main`, or merge. They post their review comments and STOP. Wait for further instructions from the user.** Once the user approves, the feature branch is merged to `main` via a single PR — this is the only point where code reaches `main`.
+
 ## Post-Task Checklist
 
-After completing each task (issue), you **must** perform these steps before considering it done:
+After completing work on any task, you **must** perform the applicable steps:
 
-1. **Verify CI pipeline**: After pushing or creating a PR, check that the GitHub Actions CI pipeline passes (`gh pr checks <number>` or `gh run list`). If any job fails, investigate the logs (`gh run view <id> --log-failed`), fix the issue, and push again. Do not leave a PR with failing CI.
-2. **Update GitHub issue status**: Close the relevant GitHub issue when the PR is merged, or add a comment noting the PR number and current status. Use `gh issue close <number>` after merge confirmation, or `gh issue comment <number> --body "..."` for status updates.
+### For Engineers (per sub-issue)
+
+1. **Branch from the feature branch**: `git checkout -b feat/<sub-issue-slug> feat/<story-slug>` (never branch from `main` directly).
+2. **Run verification**: Execute the verification step defined in the sub-issue (tests, lint, type checks).
+3. **Submit for Tech Lead code review**: Push the branch and request review from the Tech Lead.
+4. **Address review feedback**: Revise code as directed by the Tech Lead until approved.
+5. **Merge into feature branch**: After Tech Lead approval, merge your branch into `feat/<story-slug>`.
+6. **Close the sub-issue**: `gh issue close <number>`.
+
+### For Tech Lead (per user story)
+
+1. **Create the feature branch**: After sub-issues are finalized and architect-approved, create `feat/<story-slug>` from `main` and push it.
+2. **Review engineer code** (per sub-issue): Verify implementation matches the sub-issue spec, code quality, standards adherence, and test coverage.
+3. **Approve or request changes**: Direct the engineer to revise if needed; approve when ready to merge into the feature branch.
+4. **Ensure feature branch is clean**: After all sub-issues are merged, verify the feature branch builds and passes all tests.
+
+### For Software Architect (per parent story)
+
+1. **Verify all sub-issues are closed**: Check that every sub-issue under the parent is closed.
+2. **Review implementation against design**: Verify alignment with `docs/detailed_design.md` and architectural principles on the feature branch.
+3. **Resolve misalignment**: If implementation is wrong, direct the Tech Lead to create corrective sub-issues (work continues on the feature branch). If the design needs updating, update the documentation.
+4. **Post review comment**: Add your verification as a comment on the parent issue with a `## Architecture Verification` heading.
+
+### For Reviewers (per parent story)
+
+1. **Wait for Architecture Verification**: Do not begin review until the Software Architect's verification is complete.
+2. **Post review comment**: Add your review feedback as a comment on the parent issue using `gh issue comment <number> --body "..."`.
+3. **STOP and wait**: Do NOT close the parent issue. Do NOT create the PR to `main` or merge. Wait for further instructions from the user.
 
 ## API Design
 
