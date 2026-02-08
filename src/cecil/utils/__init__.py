@@ -10,6 +10,8 @@ from cecil.utils.errors import (
     ProviderDependencyError,
     ProviderReadError,
     SanitizationError,
+    ServerError,
+    ServerStartupError,
     TelemetryBlockedError,
     TelemetryError,
 )
@@ -23,6 +25,8 @@ __all__ = [
     "ProviderDependencyError",
     "ProviderReadError",
     "SanitizationError",
+    "ServerError",
+    "ServerStartupError",
     "TelemetryBlockedError",
     "TelemetryError",
 ]
