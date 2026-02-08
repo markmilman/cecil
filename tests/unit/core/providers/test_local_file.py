@@ -2,18 +2,24 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from cecil.core.providers.base import BaseDataProvider
 from cecil.core.providers.local_file import LocalFileProvider
-from cecil.utils.errors import ProviderConnectionError, ProviderReadError
+from cecil.utils.errors import (
+    ProviderConnectionError,
+    ProviderDependencyError,
+    ProviderReadError,
+)
 
 
-# ── Constructor and format detection ──────────────────────────────────
+# -- Constructor and format detection --------------------------------------
 
 
 class TestLocalFileProviderInit:
@@ -57,7 +63,7 @@ class TestLocalFileProviderInit:
         assert provider.format == "jsonl"
 
 
-# ── connect() ─────────────────────────────────────────────────────────
+# -- connect() -------------------------------------------------------------
 
 
 class TestLocalFileProviderConnect:
@@ -98,7 +104,7 @@ class TestLocalFileProviderConnect:
             provider.connect()
 
 
-# ── close() ───────────────────────────────────────────────────────────
+# -- close() ---------------------------------------------------------------
 
 
 class TestLocalFileProviderClose:
@@ -117,7 +123,7 @@ class TestLocalFileProviderClose:
         provider.close()
 
 
-# ── Context manager ───────────────────────────────────────────────────
+# -- Context manager -------------------------------------------------------
 
 
 class TestLocalFileProviderContextManager:
@@ -144,7 +150,7 @@ class TestLocalFileProviderContextManager:
         assert provider._file_handle is None
 
 
-# ── stream_records() JSONL ────────────────────────────────────────────
+# -- stream_records() JSONL ------------------------------------------------
 
 
 class TestLocalFileProviderStreamJSONL:
@@ -217,30 +223,199 @@ class TestLocalFileProviderStreamJSONL:
         assert records == expected
 
 
-# ── stream_records() unsupported formats ──────────────────────────────
+# -- stream_records() CSV --------------------------------------------------
+
+
+class TestLocalFileProviderStreamCSV:
+    """Verify CSV streaming behavior."""
+
+    def test_stream_records_csv_yields_all_records(
+        self,
+        tmp_csv_path: Path,
+    ) -> None:
+        """Basic CSV with 5 rows yields exactly 5 records."""
+        with LocalFileProvider(file_path=tmp_csv_path) as provider:
+            records = list(provider.stream_records())
+        assert len(records) == 5
+
+    def test_stream_records_csv_yields_dicts(self, tmp_csv_path: Path) -> None:
+        """Each CSV record is yielded as a dict."""
+        with LocalFileProvider(file_path=tmp_csv_path) as provider:
+            for record in provider.stream_records():
+                assert isinstance(record, dict)
+
+    def test_stream_records_csv_with_custom_delimiter(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """TSV file with delimiter='\t' is read correctly."""
+        path = tmp_path / "data.csv"
+        path.write_text(
+            "name\tage\tcity\nAlice\t30\tPortland\nBob\t25\tChicago\n",
+            encoding="utf-8",
+        )
+        with LocalFileProvider(
+            file_path=path,
+            delimiter="\t",
+        ) as provider:
+            records = list(provider.stream_records())
+        assert len(records) == 2
+        assert records[0] == {"name": "Alice", "age": "30", "city": "Portland"}
+        assert records[1] == {"name": "Bob", "age": "25", "city": "Chicago"}
+
+    def test_stream_records_csv_header_only(self, tmp_path: Path) -> None:
+        """CSV file with only a header row yields nothing."""
+        path = tmp_path / "header_only.csv"
+        path.write_text("name,age,city\n", encoding="utf-8")
+        with LocalFileProvider(file_path=path) as provider:
+            records = list(provider.stream_records())
+        assert records == []
+
+    def test_stream_records_csv_quoted_fields(self, tmp_path: Path) -> None:
+        """Fields containing commas and newlines are handled correctly."""
+        path = tmp_path / "quoted.csv"
+        # Use csv.writer to produce correct quoting
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(["name", "bio", "city"])
+            writer.writerow(["Alice", "Loves coding, hiking", "Portland"])
+            writer.writerow(["Bob", "Line1\nLine2", "Chicago"])
+        with LocalFileProvider(file_path=path) as provider:
+            records = list(provider.stream_records())
+        assert len(records) == 2
+        assert records[0]["bio"] == "Loves coding, hiking"
+        assert records[1]["bio"] == "Line1\nLine2"
+
+    def test_stream_records_csv_skips_empty_rows(self, tmp_path: Path) -> None:
+        """Blank lines interspersed in a CSV are skipped."""
+        path = tmp_path / "blanks.csv"
+        path.write_text(
+            "name,age\nAlice,30\n\n  ,  \nBob,25\n",
+            encoding="utf-8",
+        )
+        with LocalFileProvider(file_path=path) as provider:
+            records = list(provider.stream_records())
+        assert len(records) == 2
+        assert records[0]["name"] == "Alice"
+        assert records[1]["name"] == "Bob"
+
+    def test_csv_format_no_longer_raises_not_implemented(
+        self,
+        tmp_csv_path: Path,
+    ) -> None:
+        """Verify CSV streaming does not raise NotImplementedError."""
+        with LocalFileProvider(file_path=tmp_csv_path) as provider:
+            # Should not raise NotImplementedError
+            records = list(provider.stream_records())
+        assert len(records) > 0
+
+
+# -- stream_records() unsupported formats ----------------------------------
 
 
 class TestLocalFileProviderUnsupportedFormats:
-    """Verify NotImplementedError for non-JSONL formats."""
+    """Verify NotImplementedError for formats not yet implemented."""
 
-    def test_csv_format_raises_not_implemented(self, tmp_csv_path: Path) -> None:
+    def test_unknown_format_raises_not_implemented(self, tmp_path: Path) -> None:
+        path = tmp_path / "data.xyz"
+        path.write_text("dummy", encoding="utf-8")
         with (
-            LocalFileProvider(file_path=tmp_csv_path) as provider,
-            pytest.raises(NotImplementedError, match="csv"),
-        ):
-            list(provider.stream_records())
-
-    def test_parquet_format_raises_not_implemented(self, tmp_path: Path) -> None:
-        path = tmp_path / "data.parquet"
-        path.write_bytes(b"dummy")
-        with (
-            LocalFileProvider(file_path=path) as provider,
-            pytest.raises(NotImplementedError, match="parquet"),
+            LocalFileProvider(file_path=path, format_hint="xyz") as provider,
+            pytest.raises(NotImplementedError, match="xyz"),
         ):
             list(provider.stream_records())
 
 
-# ── fetch_metadata() ──────────────────────────────────────────────────
+# -- stream_records() Parquet ----------------------------------------------
+
+
+class TestLocalFileProviderStreamParquet:
+    """Verify Parquet streaming behavior."""
+
+    def test_stream_records_parquet_yields_all_records(
+        self,
+        tmp_parquet_path: Path,
+    ) -> None:
+        """All rows in the Parquet file are yielded."""
+        with LocalFileProvider(file_path=tmp_parquet_path) as provider:
+            records = list(provider.stream_records())
+        assert len(records) == 5
+
+    def test_stream_records_parquet_yields_dicts(
+        self,
+        tmp_parquet_path: Path,
+    ) -> None:
+        """Each yielded record is a plain Python dict."""
+        with LocalFileProvider(file_path=tmp_parquet_path) as provider:
+            for record in provider.stream_records():
+                assert isinstance(record, dict)
+
+    def test_stream_records_parquet_preserves_types(
+        self,
+        tmp_parquet_path: Path,
+    ) -> None:
+        """Python-native types are returned after .as_py() conversion."""
+        with LocalFileProvider(file_path=tmp_parquet_path) as provider:
+            first = next(provider.stream_records())
+        # String columns
+        assert isinstance(first["email"], str)
+        assert isinstance(first["name"], str)
+        # Integer column
+        assert isinstance(first["tokens_in"], int)
+        # Float column
+        assert isinstance(first["cost_usd"], float)
+
+    def test_parquet_without_pyarrow_raises_dependency_error(
+        self,
+        tmp_parquet_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """ProviderDependencyError is raised when pyarrow is not installed."""
+        import builtins
+
+        real_import = builtins.__import__
+
+        def mock_import(
+            name: str,
+            *args: Any,
+            **kwargs: Any,
+        ) -> Any:
+            if name == "pyarrow.parquet" or name == "pyarrow":
+                raise ImportError("mocked missing pyarrow")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+        with (
+            LocalFileProvider(file_path=tmp_parquet_path) as provider,
+            pytest.raises(
+                ProviderDependencyError,
+                match="pyarrow",
+            ),
+        ):
+            list(provider.stream_records())
+
+    def test_parquet_format_no_longer_raises_not_implemented(
+        self,
+        tmp_parquet_path: Path,
+    ) -> None:
+        """Parquet format is handled without raising NotImplementedError."""
+        with LocalFileProvider(file_path=tmp_parquet_path) as provider:
+            records = list(provider.stream_records())
+        assert len(records) > 0
+
+    def test_parquet_record_count_updated_after_streaming(
+        self,
+        tmp_parquet_path: Path,
+    ) -> None:
+        """fetch_metadata() reflects the correct record count after streaming."""
+        with LocalFileProvider(file_path=tmp_parquet_path) as provider:
+            list(provider.stream_records())
+            meta = provider.fetch_metadata()
+        assert meta["record_count"] == 5
+        assert meta["format"] == "parquet"
+
+
+# -- fetch_metadata() ------------------------------------------------------
 
 
 class TestLocalFileProviderFetchMetadata:
@@ -294,7 +469,7 @@ class TestLocalFileProviderFetchMetadata:
         assert meta["file_size_bytes"] is None
 
 
-# ── Registry integration ──────────────────────────────────────────────
+# -- Registry integration -------------------------------------------------
 
 
 class TestLocalFileProviderRegistry:

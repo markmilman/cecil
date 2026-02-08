@@ -1,23 +1,38 @@
 """Local file data provider.
 
 Reads structured data from local files (JSONL, CSV, Parquet) and yields
-records one at a time through a memory-efficient generator.  Only JSONL
-is supported in this initial implementation; CSV and Parquet handlers
-will be added in subsequent sub-issues.
+records one at a time through a memory-efficient generator.
+
+Supported formats:
+
+- **JSONL**: Each line is a JSON object yielding ``dict[str, Any]``.
+- **CSV**: Uses ``csv.DictReader`` for streaming.  Note that all CSV
+  values are strings (``dict[str, str]``) because ``csv.DictReader``
+  does not perform type coercion.  Callers that need typed values
+  should cast after receiving records.  Custom delimiter and quoting
+  options can be passed to the constructor.
+- **Parquet**: Uses PyArrow (optional dependency) for row-group-based
+  streaming.  Values are converted to native Python types via
+  ``.as_py()``.
 """
 
 from __future__ import annotations
 
 import contextlib
+import csv
 import json
 import logging
 import os
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from cecil.core.providers.base import BaseDataProvider
-from cecil.utils.errors import ProviderConnectionError, ProviderReadError
+from cecil.utils.errors import (
+    ProviderConnectionError,
+    ProviderDependencyError,
+    ProviderReadError,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +44,9 @@ _EXTENSION_FORMAT_MAP: dict[str, str] = {
     ".parquet": "parquet",
 }
 
+# Valid quoting constants for csv module.
+_QuotingType = Literal[0, 1, 2, 3]
+
 # I/O buffer size for open() calls (8 KB).
 _IO_BUFFER_SIZE = 8192
 
@@ -37,14 +55,17 @@ class LocalFileProvider(BaseDataProvider):
     """Provider that streams records from a local file.
 
     Supports automatic format detection from the file extension, or an
-    explicit format_hint override.  Currently only JSONL files are
-    handled; CSV and Parquet support will be added later.
+    explicit format_hint override.  Currently JSONL and CSV files are
+    handled.  Parquet files are also supported when PyArrow is installed.
 
     Args:
         file_path: Path to the local file to read.
         format_hint: Override format detection (e.g. "jsonl").
             When None, the format is inferred from the file extension.
         encoding: Text encoding for the file.  Defaults to "utf-8".
+        delimiter: Column delimiter for CSV files.  Defaults to ",".
+        quoting: Quoting strategy for CSV files.  Defaults to
+            ``csv.QUOTE_MINIMAL``.
     """
 
     def __init__(
@@ -52,15 +73,19 @@ class LocalFileProvider(BaseDataProvider):
         file_path: str | Path,
         format_hint: str | None = None,
         encoding: str = "utf-8",
+        delimiter: str = ",",
+        quoting: _QuotingType = csv.QUOTE_MINIMAL,
     ) -> None:
         self._file_path = Path(file_path)
         self._format_hint = format_hint
         self._encoding = encoding
+        self._delimiter = delimiter
+        self._quoting: _QuotingType = quoting
         self._file_handle: Any | None = None
         self._record_count: int = 0
         self._format: str = self._detect_format()
 
-    # ── Public interface ───────────────────────────────────────────────
+    # -- Public interface ---------------------------------------------------
 
     def connect(self) -> None:
         """Verify the file exists and open it for reading.
@@ -76,14 +101,18 @@ class LocalFileProvider(BaseDataProvider):
         if not os.access(self._file_path, os.R_OK):
             raise ProviderConnectionError(f"File is not readable: {self._file_path}")
 
-        try:
-            self._file_handle = open(  # noqa: SIM115
-                self._file_path,
-                encoding=self._encoding,
-                buffering=_IO_BUFFER_SIZE,
-            )
-        except OSError as err:
-            raise ProviderConnectionError(f"Cannot open file: {self._file_path}") from err
+        # Parquet files are opened by PyArrow directly, not by us.
+        if self._format != "parquet":
+            try:
+                self._file_handle = open(  # noqa: SIM115
+                    self._file_path,
+                    encoding=self._encoding,
+                    buffering=_IO_BUFFER_SIZE,
+                )
+            except OSError as err:
+                raise ProviderConnectionError(
+                    f"Cannot open file: {self._file_path}",
+                ) from err
 
         logger.info(
             "LocalFileProvider connected",
@@ -97,18 +126,29 @@ class LocalFileProvider(BaseDataProvider):
         """Yield records one at a time from the file.
 
         For JSONL files each line is parsed as a separate JSON object.
-        Blank lines are silently skipped.
+        For CSV files each row is yielded as a ``dict[str, str]``.
+        For Parquet files, row groups are read incrementally and
+        individual rows are yielded as ``dict[str, Any]``.
+        Blank lines are silently skipped in text-based formats.
 
         Yields:
             A single data record as a dictionary.
 
         Raises:
-            ProviderReadError: If a line cannot be parsed as JSON.
+            ProviderReadError: If a line cannot be parsed as JSON (JSONL)
+                or the file handle is not open.
+            ProviderDependencyError: If pyarrow is not installed for
+                Parquet files.
             NotImplementedError: If the file format is not yet supported.
         """
-        if self._format != "jsonl":
+        if self._format == "jsonl":
+            yield from self._stream_jsonl()
+        elif self._format == "csv":
+            yield from self._stream_csv()
+        elif self._format == "parquet":
+            yield from self._stream_parquet()
+        else:
             raise NotImplementedError(f"Format not yet supported: {self._format}")
-        yield from self._stream_jsonl()
 
     def close(self) -> None:
         """Close the file handle and release resources.
@@ -143,7 +183,7 @@ class LocalFileProvider(BaseDataProvider):
             "record_count": self._record_count,
         }
 
-    # ── Properties ─────────────────────────────────────────────────────
+    # -- Properties ---------------------------------------------------------
 
     @property
     def file_path(self) -> Path:
@@ -155,7 +195,7 @@ class LocalFileProvider(BaseDataProvider):
         """The detected or overridden format identifier."""
         return self._format
 
-    # ── Private helpers ────────────────────────────────────────────────
+    # -- Private helpers ----------------------------------------------------
 
     def _detect_format(self) -> str:
         """Determine file format from hint or extension.
@@ -207,6 +247,99 @@ class LocalFileProvider(BaseDataProvider):
 
         logger.info(
             "JSONL stream complete",
+            extra={
+                "path": str(self._file_path),
+                "records_yielded": self._record_count,
+            },
+        )
+
+    def _stream_csv(self) -> Generator[dict[str, Any], None, None]:
+        """Stream records from a CSV file.
+
+        Uses ``csv.DictReader`` so each row is yielded as a
+        ``dict[str, str]`` (a subtype of ``dict[str, Any]``).
+        Empty rows (where all values are ``None`` or empty strings)
+        are silently skipped.
+
+        Yields:
+            A single CSV row as a dictionary mapping column names to
+            string values.
+
+        Raises:
+            ProviderReadError: If the file handle is not open.
+        """
+        if self._file_handle is None:
+            raise ProviderReadError("File handle is not open. Call connect() first.")
+
+        self._record_count = 0
+        # Cast file handle from Any to Iterable[str] for mypy overload
+        # resolution; at runtime _file_handle is always a text-mode file.
+        handle: Iterable[str] = self._file_handle
+        reader = csv.DictReader(
+            handle,
+            delimiter=self._delimiter,
+            quoting=self._quoting,
+        )
+        for row in reader:
+            # Skip empty rows: all values are None or whitespace-only.
+            if all(v is None or v.strip() == "" for v in row.values()):
+                continue
+            self._record_count += 1
+            yield dict(row)
+
+        logger.info(
+            "CSV stream complete",
+            extra={
+                "path": str(self._file_path),
+                "records_yielded": self._record_count,
+            },
+        )
+
+    def _stream_parquet(self) -> Generator[dict[str, Any], None, None]:
+        """Stream records from a Parquet file using PyArrow.
+
+        Reads row groups incrementally via ``pyarrow.parquet.ParquetFile``
+        to keep memory usage bounded.  Each row is converted to a Python
+        dictionary with native Python types (via ``.as_py()``).
+
+        Yields:
+            A single row as a dictionary with Python-native values.
+
+        Raises:
+            ProviderDependencyError: If ``pyarrow`` is not installed.
+            ProviderReadError: If the Parquet file cannot be read.
+        """
+        try:
+            import pyarrow.parquet as pq  # type: ignore[import-untyped]
+        except ImportError as err:
+            raise ProviderDependencyError(
+                "Parquet support requires pyarrow. Install with: pip install pyarrow",
+            ) from err
+
+        try:
+            pf = pq.ParquetFile(self._file_path)
+        except Exception as err:
+            raise ProviderReadError(
+                f"Cannot read Parquet file: {self._file_path}",
+            ) from err
+
+        self._record_count = 0
+        column_names: list[str] = pf.schema_arrow.names
+
+        for row_group_idx in range(pf.metadata.num_row_groups):
+            table = pf.read_row_group(row_group_idx)
+            for batch in table.to_batches():
+                # Convert columnar batch to row-wise dicts efficiently.
+                columns: dict[str, Any] = {name: batch.column(name) for name in column_names}
+                for row_idx in range(batch.num_rows):
+                    record: dict[str, Any] = {
+                        name: columns[name][row_idx].as_py() for name in column_names
+                    }
+                    self._record_count += 1
+                    yield record
+
+        logger.info(
+            "Parquet stream complete",
             extra={
                 "path": str(self._file_path),
                 "records_yielded": self._record_count,
