@@ -99,6 +99,52 @@ class ScanResponse(BaseModel):
     )
 
 
+class FilesystemEntry(BaseModel):
+    """A single file or directory entry returned by the filesystem browse endpoint."""
+
+    name: str = Field(description="File or directory name")
+    path: str = Field(description="Absolute path to the entry")
+    size: int | None = Field(
+        default=None,
+        description="File size in bytes (None for directories)",
+    )
+    modified: datetime | None = Field(
+        default=None,
+        description="Last modified timestamp (None if unavailable)",
+    )
+    is_directory: bool = Field(description="Whether the entry is a directory")
+    is_readable: bool = Field(
+        default=True,
+        description="Whether the entry can be read by the current user",
+    )
+    format: FileFormat | None = Field(
+        default=None,
+        description="Detected file format for supported extensions (None for dirs or unknown)",
+    )
+
+
+class BrowseResponse(BaseModel):
+    """Response from the filesystem browse endpoint."""
+
+    current_path: str = Field(description="Absolute path of the browsed directory")
+    parent_path: str | None = Field(
+        default=None,
+        description="Absolute path of the parent directory (None for root)",
+    )
+    directories: list[FilesystemEntry] = Field(
+        default_factory=list,
+        description="List of subdirectory entries",
+    )
+    files: list[FilesystemEntry] = Field(
+        default_factory=list,
+        description="List of file entries (filtered by supported formats unless show_all)",
+    )
+    error: str | None = Field(
+        default=None,
+        description="Human-readable error message if browsing failed",
+    )
+
+
 class ScanProgress(BaseModel):
     """Real-time progress information for an active scan."""
 
