@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MapIcon, FileSearchIcon } from 'lucide-react';
+import { UploadIcon, MapIcon, FileSearchIcon } from 'lucide-react';
 
 /**
  * Props for the Shell component
@@ -28,6 +28,11 @@ export function Shell({ children }: ShellProps) {
   const location = useLocation();
 
   const navItems: NavItem[] = [
+    {
+      path: '/ingest',
+      label: 'Ingest',
+      icon: <UploadIcon className="h-5 w-5" />,
+    },
     {
       path: '/mapping',
       label: 'Mapping',
