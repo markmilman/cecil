@@ -1,13 +1,15 @@
-"""Tests for the POST /api/v1/scans endpoint."""
+"""Tests for the /api/v1/scans endpoints."""
 
 from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 
 def _create_jsonl_file(tmp_path: Path, records: int = 3) -> Path:
@@ -214,8 +216,144 @@ class TestPostScans:
         assert response.json()["records_processed"] >= 0
 
 
+class TestGetScan:
+    """Tests for GET /api/v1/scans/{scan_id} endpoint."""
+
+    def test_get_scan_existing_returns_200(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """An existing scan returns 200 with correct fields."""
+        jsonl_file = _create_jsonl_file(tmp_path)
+        post_resp = client.post(
+            "/api/v1/scans/",
+            json={"source": str(jsonl_file)},
+        )
+        scan_id = post_resp.json()["scan_id"]
+
+        response = client.get(f"/api/v1/scans/{scan_id}")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["scan_id"] == scan_id
+        assert "status" in body
+        assert "source" in body
+        assert "file_format" in body
+        assert "created_at" in body
+        assert "records_processed" in body
+
+    def test_get_scan_unknown_returns_404(
+        self,
+        client: TestClient,
+    ) -> None:
+        """A random UUID returns 404 with scan_not_found error."""
+        unknown_id = str(uuid.uuid4())
+
+        response = client.get(f"/api/v1/scans/{unknown_id}")
+
+        assert response.status_code == 404
+        body = response.json()
+        assert body["error"] == "scan_not_found"
+
+    def test_get_scan_completed_shows_records(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A completed scan shows correct records_processed count.
+
+        TestClient runs background tasks synchronously, so by the
+        time we GET the scan it should already be completed.
+        """
+        jsonl_file = _create_jsonl_file(tmp_path, records=3)
+        post_resp = client.post(
+            "/api/v1/scans/",
+            json={"source": str(jsonl_file)},
+        )
+        scan_id = post_resp.json()["scan_id"]
+
+        response = client.get(f"/api/v1/scans/{scan_id}")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["records_processed"] == 3
+        assert body["status"] == "completed"
+
+
+class TestScanWebSocket:
+    """Tests for WebSocket /api/v1/scans/{scan_id}/ws endpoint."""
+
+    def test_websocket_receives_progress(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """WebSocket delivers at least one progress message with expected fields."""
+        jsonl_file = _create_jsonl_file(tmp_path)
+        resp = client.post(
+            "/api/v1/scans/",
+            json={"source": str(jsonl_file)},
+        )
+        scan_id = resp.json()["scan_id"]
+
+        with client.websocket_connect(f"/api/v1/scans/{scan_id}/ws") as ws:
+            data = ws.receive_json()
+            assert data["scan_id"] == scan_id
+            assert "status" in data
+            assert "records_processed" in data
+            assert "elapsed_seconds" in data
+
+    def test_websocket_unknown_scan_closes_4004(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Connecting to a WebSocket for an unknown scan closes with code 4004."""
+        unknown_id = str(uuid.uuid4())
+
+        with (
+            pytest.raises(WebSocketDisconnect) as exc_info,
+            client.websocket_connect(f"/api/v1/scans/{unknown_id}/ws") as ws,
+        ):
+            ws.receive_json()
+
+        assert exc_info.value.code == 4004
+
+    def test_websocket_sends_final_status(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """WebSocket sends a final completed message then closes.
+
+        Since TestClient runs background tasks synchronously, the scan
+        is already complete when we connect.  The WebSocket should send
+        one message with terminal status and then close.
+        """
+        jsonl_file = _create_jsonl_file(tmp_path, records=3)
+        resp = client.post(
+            "/api/v1/scans/",
+            json={"source": str(jsonl_file)},
+        )
+        scan_id = resp.json()["scan_id"]
+
+        messages: list[dict[str, object]] = []
+        with client.websocket_connect(f"/api/v1/scans/{scan_id}/ws") as ws:
+            # Read messages until the WebSocket closes.
+            try:
+                while True:
+                    messages.append(ws.receive_json())
+            except WebSocketDisconnect:
+                pass
+
+        assert len(messages) >= 1
+        last = messages[-1]
+        assert last["status"] == "completed"
+        assert last["records_processed"] == 3
+
+
 @pytest.fixture(autouse=True)
-def _clear_scan_store():
+def _clear_scan_store() -> Generator[None, None, None]:
     """Clear the in-memory scan store between tests."""
     from cecil.api.routes.scans import _scan_store
 

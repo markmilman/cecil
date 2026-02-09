@@ -1,24 +1,27 @@
 """Scan management API routes.
 
-Provides the POST /api/v1/scans endpoint for initiating file scans
-and a background task executor that streams records through the
-provider pipeline.
+Provides the POST /api/v1/scans endpoint for initiating file scans,
+GET /api/v1/scans/{scan_id} for retrieving scan status, a WebSocket
+endpoint for real-time progress streaming, and a background task
+executor that streams records through the provider pipeline.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
 from cecil.api.schemas import (
     ErrorResponse,
     FileFormat,
+    ScanProgress,
     ScanRequest,
     ScanResponse,
     ScanStatus,
@@ -240,3 +243,77 @@ async def create_scan(
     )
 
     return _scan_state_to_response(state)
+
+
+@router.get(
+    "/{scan_id}",
+    response_model=ScanResponse,
+    responses={404: {"model": ErrorResponse}},
+)
+async def get_scan(scan_id: str) -> ScanResponse | JSONResponse:
+    """Retrieve the current status of a scan.
+
+    Args:
+        scan_id: The unique scan identifier.
+
+    Returns:
+        A ScanResponse with the scan's current metadata, or a 404
+        JSONResponse if no scan matches the given ID.
+    """
+    state = _scan_store.get(scan_id)
+    if state is None:
+        return JSONResponse(
+            status_code=404,
+            content=ErrorResponse(
+                error="scan_not_found",
+                message="No scan found with the given ID",
+            ).model_dump(),
+        )
+    return _scan_state_to_response(state)
+
+
+@router.websocket("/{scan_id}/ws")
+async def scan_progress_ws(websocket: WebSocket, scan_id: str) -> None:
+    """Stream real-time scan progress over WebSocket.
+
+    Sends periodic ``ScanProgress`` JSON messages until the scan
+    reaches a terminal state (``COMPLETED`` or ``FAILED``), then
+    closes the connection.  If the scan ID is unknown the WebSocket
+    is closed immediately with code 4004.
+
+    Args:
+        websocket: The incoming WebSocket connection.
+        scan_id: The unique scan identifier to monitor.
+    """
+    state = _scan_store.get(scan_id)
+    if state is None:
+        await websocket.close(code=4004, reason="Scan not found")
+        return
+
+    await websocket.accept()
+    try:
+        while True:
+            elapsed = (datetime.now(tz=UTC) - state.created_at).total_seconds()
+            progress = ScanProgress(
+                scan_id=state.scan_id,
+                status=state.status,
+                records_processed=state.records_processed,
+                total_records=None,
+                percent_complete=None,
+                elapsed_seconds=elapsed,
+                error_type=state.errors[0] if state.errors else None,
+            )
+            await websocket.send_json(progress.model_dump())
+
+            if state.status in (ScanStatus.COMPLETED, ScanStatus.FAILED):
+                break
+
+            await asyncio.sleep(0.5)
+    except WebSocketDisconnect:
+        logger.info(
+            "WebSocket client disconnected",
+            extra={"scan_id": scan_id},
+        )
+        return
+
+    await websocket.close()
