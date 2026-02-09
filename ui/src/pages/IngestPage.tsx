@@ -99,19 +99,19 @@ export function IngestPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-10">
       <div className="max-w-6xl mx-auto">
         {/* Page Header */}
         <div className="flex items-center gap-3 mb-2">
           <UploadIcon className="h-8 w-8 text-accent" />
-          <h1 className="text-3xl font-bold text-primary">File Ingestion</h1>
+          <h1 className="text-3xl font-extrabold text-primary">File Ingestion</h1>
         </div>
-        <p className="text-muted mb-8">
+        <p className="text-slate-600 leading-relaxed mb-8">
           Select a local data file to sanitize. Supported formats: JSONL, CSV, and Parquet.
         </p>
 
         {/* Main Content — conditional on page state */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {pageState === 'idle' && (
             <>
               <FilePickerCard
@@ -139,7 +139,9 @@ export function IngestPage() {
                 disabled={isSubmitting || isScanning || !selectedFile}
                 className={`
                   px-6 py-3 rounded-lg font-medium text-white
-                  transition-colors duration-150
+                  transition-all duration-150 ease-out
+                  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
+                  active:scale-[0.98]
                   ${isSubmitting || isScanning || !selectedFile
                     ? 'bg-slate-300 cursor-not-allowed'
                     : 'bg-accent hover:bg-indigo-700'

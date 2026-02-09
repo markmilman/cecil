@@ -16,9 +16,10 @@ const makeProgress = (overrides: Partial<ScanProgress> = {}): ScanProgress => ({
 });
 
 describe('IngestionProgress', () => {
-  it('shows connecting state when progress is null', () => {
-    render(<IngestionProgress progress={null} isConnected={false} />);
-    expect(screen.getByText('Connecting...')).toBeInTheDocument();
+  it('shows shimmer skeleton when progress is null', () => {
+    const { container } = render(<IngestionProgress progress={null} isConnected={false} />);
+    // Shimmer skeleton has animate-shimmer class elements
+    expect(container.querySelector('.animate-shimmer')).toBeInTheDocument();
   });
 
   it('renders the progress bar with correct ARIA attributes', () => {
