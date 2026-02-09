@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadIcon, CheckCircleIcon, AlertCircleIcon, RefreshCwIcon, ArrowRightIcon } from 'lucide-react';
+import { UploadIcon, CheckCircleIcon, AlertCircleIcon, RefreshCwIcon, ArrowRightIcon, InfoIcon, XIcon } from 'lucide-react';
+import { WelcomeModal } from '@/components/common/WelcomeModal';
 import { FilePickerCard } from '@/components/ingestion/FilePickerCard';
 import { FormatSelector } from '@/components/ingestion/FormatSelector';
 import { IngestionProgress } from '@/components/ingestion/IngestionProgress';
@@ -27,6 +28,22 @@ export function IngestPage() {
   const [error, setError] = useState<string | null>(null);
   const [scanId, setScanId] = useState<string | null>(null);
   const { progress, isConnected } = useScanProgress(scanId);
+  const [showHelper, setShowHelper] = useState(() => {
+    try {
+      return localStorage.getItem('cecil:ingest_helper_dismissed') !== 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const dismissHelper = () => {
+    setShowHelper(false);
+    try {
+      localStorage.setItem('cecil:ingest_helper_dismissed', 'true');
+    } catch {
+      // Silently ignore storage errors
+    }
+  };
 
   const handleFileSelect = (_path: string, metadata: FileSelectionMetadata) => {
     setSelectedFile({
@@ -99,6 +116,8 @@ export function IngestPage() {
   };
 
   return (
+    <>
+    <WelcomeModal />
     <div className="p-10">
       <div className="max-w-6xl mx-auto">
         {/* Page Header */}
@@ -109,6 +128,28 @@ export function IngestPage() {
         <p className="text-slate-600 leading-relaxed mb-8">
           Select a local data file to sanitize. Supported formats: JSONL, CSV, and Parquet.
         </p>
+
+        {/* Inline Helper Banner */}
+        {showHelper && pageState === 'idle' && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-8 flex items-start gap-3">
+            <InfoIcon className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-primary">New to Cecil?</p>
+              <p className="text-sm text-slate-600 mt-0.5">
+                Select a data file using the file browser below to begin sanitizing your data.
+                Cecil processes everything locally on your machine.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={dismissHelper}
+              className="flex-shrink-0 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+              aria-label="Dismiss helper"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* Main Content — conditional on page state */}
         <div className="space-y-8">
@@ -211,5 +252,6 @@ export function IngestPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
