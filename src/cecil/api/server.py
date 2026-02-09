@@ -15,12 +15,16 @@ import types
 
 import httpx
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
+from cecil.api.routes.filesystem import router as filesystem_router
 from cecil.api.routes.scans import router as scans_router
 from cecil.api.schemas import ErrorResponse, HealthResponse
 from cecil.utils.errors import ServerStartupError
+from cecil.utils.paths import get_ui_dist_path
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +70,43 @@ def create_app() -> FastAPI:
         """Return server health status."""
         return HealthResponse(status="ok", version=_CECIL_VERSION)
 
+    application.include_router(filesystem_router)
     application.include_router(scans_router)
+
+    # Serve the built React UI.  Static assets (JS, CSS, images) are
+    # served from ``/assets/`` by the ``StaticFiles`` mount.  A catch-all
+    # route returns ``index.html`` for any other non-API path so that
+    # client-side routing (e.g. /ingest, /audit) works correctly.
+    try:
+        ui_dist = get_ui_dist_path()
+        index_html = ui_dist / "index.html"
+
+        # Serve hashed asset bundles produced by Vite.
+        assets_dir = ui_dist / "assets"
+        if assets_dir.is_dir():
+            application.mount(
+                "/assets",
+                StaticFiles(directory=str(assets_dir)),
+                name="ui-assets",
+            )
+
+        # SPA catch-all: any path not matched by API routes or /assets
+        # returns index.html so React Router handles the route.
+        @application.get("/{full_path:path}", include_in_schema=False)
+        async def spa_fallback(request: Request, full_path: str) -> FileResponse:
+            """Serve index.html for all unmatched paths (SPA routing)."""
+            # If a specific static file exists (e.g. vite.svg), serve it.
+            candidate = ui_dist / full_path
+            if full_path and candidate.is_file():
+                return FileResponse(str(candidate))
+            return FileResponse(str(index_html))
+
+        logger.info("Serving UI from %s", ui_dist)
+    except FileNotFoundError:
+        logger.warning(
+            "UI assets not found — the web interface will not be available. "
+            "Run 'npm run build' in ui/ to build the frontend.",
+        )
 
     return application
 
@@ -94,6 +134,17 @@ class ServerManager:
         """The port the server is bound to, or ``None`` if not started."""
         return self._port
 
+    def set_port(self, port: int) -> None:
+        """Pre-assign a port for the server to bind to.
+
+        When set before :meth:`start`, the server uses this port
+        instead of auto-selecting one.
+
+        Args:
+            port: The TCP port number to bind to.
+        """
+        self._port = port
+
     @staticmethod
     def find_available_port() -> int:
         """Find an available TCP port on the loopback interface.
@@ -117,10 +168,14 @@ class ServerManager:
         handlers for ``SIGTERM`` and ``SIGINT`` are installed to enable
         graceful shutdown when the CLI process is killed.
 
+        If ``self._port`` has already been set (e.g. via ``--port``),
+        that port is used instead of auto-selecting one.
+
         Returns:
             The port number the server started on.
         """
-        self._port = self.find_available_port()
+        if self._port is None:
+            self._port = self.find_available_port()
 
         config = uvicorn.Config(
             app="cecil.api.server:app",
@@ -130,8 +185,15 @@ class ServerManager:
         )
         self._server = uvicorn.Server(config)
 
-        signal.signal(signal.SIGTERM, self._handle_shutdown)
-        signal.signal(signal.SIGINT, self._handle_shutdown)
+        # Signal handlers can only be registered from the main thread.
+        # When start() runs in a background thread (e.g. ``cecil map``),
+        # we skip registration — the main thread handles KeyboardInterrupt
+        # and calls shutdown() directly.
+        import threading
+
+        if threading.current_thread() is threading.main_thread():
+            signal.signal(signal.SIGTERM, self._handle_shutdown)
+            signal.signal(signal.SIGINT, self._handle_shutdown)
 
         logger.info(
             "Starting IPC server",

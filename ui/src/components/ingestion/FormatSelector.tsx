@@ -14,16 +14,16 @@ const FORMAT_OPTIONS: Array<{ value: FileFormat | null; label: string; descripti
 ];
 
 /**
- * FormatSelector component
+ * FormatSelector component (v2)
  *
  * Provides a radio button group for selecting the file format for data ingestion.
- * Supports auto-detection or explicit format selection (JSONL, CSV, Parquet).
+ * V2: larger touch targets, hover shadow, enhanced selected state with scale.
  */
 export function FormatSelector({ value, onChange, disabled = false }: FormatSelectorProps) {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-6">
+    <div className="bg-white border border-slate-200 rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
       <fieldset disabled={disabled}>
-        <legend className="text-sm font-medium text-primary mb-3">File Format</legend>
+        <legend className="text-sm font-semibold text-primary mb-4">File Format</legend>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {FORMAT_OPTIONS.map((option) => {
             const isSelected = value === option.value;
@@ -33,11 +33,12 @@ export function FormatSelector({ value, onChange, disabled = false }: FormatSele
                 key={optionId}
                 htmlFor={optionId}
                 className={`
-                  flex flex-col items-center p-3 rounded-lg border-2 cursor-pointer
-                  transition-colors duration-150
+                  flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer
+                  transition-all duration-200
+                  focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-indigo-600
                   ${isSelected
-                    ? 'border-accent bg-indigo-50 text-accent'
-                    : 'border-slate-200 hover:border-slate-300 text-primary'
+                    ? 'border-accent bg-indigo-50 text-accent scale-105 shadow-md'
+                    : 'border-slate-200 hover:border-indigo-200 hover:shadow-sm text-primary'
                   }
                   ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
@@ -52,8 +53,8 @@ export function FormatSelector({ value, onChange, disabled = false }: FormatSele
                   disabled={disabled}
                   className="sr-only"
                 />
-                <span className="font-medium text-sm">{option.label}</span>
-                <span className="text-xs text-muted mt-1">{option.description}</span>
+                <span className="font-semibold text-sm">{option.label}</span>
+                <span className="text-xs text-slate-600 mt-1 text-center">{option.description}</span>
               </label>
             );
           })}

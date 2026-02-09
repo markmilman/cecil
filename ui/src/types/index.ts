@@ -65,6 +65,30 @@ export interface ScanResponse {
 }
 
 /**
+ * A single file or directory entry from the filesystem browse endpoint
+ */
+export interface FilesystemEntry {
+  name: string;
+  path: string;
+  size: number | null;
+  modified: string | null; // ISO 8601 datetime string
+  is_directory: boolean;
+  is_readable: boolean;
+  format: FileFormat | null;
+}
+
+/**
+ * Response from the filesystem browse endpoint
+ */
+export interface BrowseResponse {
+  current_path: string;
+  parent_path: string | null;
+  directories: FilesystemEntry[];
+  files: FilesystemEntry[];
+  error: string | null;
+}
+
+/**
  * Real-time progress information for an active scan
  */
 export interface ScanProgress {

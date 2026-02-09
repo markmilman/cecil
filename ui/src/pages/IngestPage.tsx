@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadIcon, CheckCircleIcon, AlertCircleIcon, RefreshCwIcon, ArrowRightIcon } from 'lucide-react';
+import { UploadIcon, CheckCircleIcon, AlertCircleIcon, RefreshCwIcon, ArrowRightIcon, InfoIcon, XIcon } from 'lucide-react';
+import { WelcomeModal } from '@/components/common/WelcomeModal';
 import { FilePickerCard } from '@/components/ingestion/FilePickerCard';
 import { FormatSelector } from '@/components/ingestion/FormatSelector';
 import { IngestionProgress } from '@/components/ingestion/IngestionProgress';
@@ -8,6 +9,8 @@ import { useScanProgress } from '@/hooks/useScanProgress';
 import { apiClient } from '@/lib/apiClient';
 import { getErrorMessage } from '@/lib/errorMessages';
 import type { FileFormat } from '@/types';
+import type { SelectedFile } from '@/components/ingestion/FilePickerCard';
+import type { FileSelectionMetadata } from '@/components/ingestion/FileBrowserModal';
 import { ScanStatus } from '@/types';
 
 /**
@@ -19,20 +22,49 @@ import { ScanStatus } from '@/types';
  */
 export function IngestPage() {
   const navigate = useNavigate();
-  const [filePath, setFilePath] = useState('');
+  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [fileFormat, setFileFormat] = useState<FileFormat | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanId, setScanId] = useState<string | null>(null);
   const { progress, isConnected } = useScanProgress(scanId);
+  const [showHelper, setShowHelper] = useState(() => {
+    try {
+      return localStorage.getItem('cecil:ingest_helper_dismissed') !== 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const dismissHelper = () => {
+    setShowHelper(false);
+    try {
+      localStorage.setItem('cecil:ingest_helper_dismissed', 'true');
+    } catch {
+      // Silently ignore storage errors
+    }
+  };
+
+  const handleFileSelect = (_path: string, metadata: FileSelectionMetadata) => {
+    setSelectedFile({
+      path: _path,
+      name: metadata.name,
+      size: metadata.size,
+      format: metadata.format,
+    });
+    // Auto-detect format from metadata if available
+    if (metadata.format) {
+      setFileFormat(metadata.format as FileFormat);
+    }
+  };
 
   const handleSubmit = async () => {
-    if (!filePath.trim()) return;
+    if (!selectedFile) return;
     setIsSubmitting(true);
     setError(null);
     try {
       const response = await apiClient.createScan({
-        source: filePath,
+        source: selectedFile.path,
         file_format: fileFormat,
       });
       setScanId(response.scan_id);
@@ -70,7 +102,7 @@ export function IngestPage() {
   // Handler: reset state for a new scan
   const handleNewScan = () => {
     setScanId(null);
-    setFilePath('');
+    setSelectedFile(null);
     setFileFormat(null);
     setError(null);
   };
@@ -84,24 +116,48 @@ export function IngestPage() {
   };
 
   return (
-    <div className="p-8">
+    <>
+    <WelcomeModal />
+    <div className="p-10">
       <div className="max-w-6xl mx-auto">
         {/* Page Header */}
         <div className="flex items-center gap-3 mb-2">
           <UploadIcon className="h-8 w-8 text-accent" />
-          <h1 className="text-3xl font-bold text-primary">File Ingestion</h1>
+          <h1 className="text-3xl font-extrabold text-primary">File Ingestion</h1>
         </div>
-        <p className="text-muted mb-8">
+        <p className="text-slate-600 leading-relaxed mb-8">
           Select a local data file to sanitize. Supported formats: JSONL, CSV, and Parquet.
         </p>
 
+        {/* Inline Helper Banner */}
+        {showHelper && pageState === 'idle' && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-8 flex items-start gap-3">
+            <InfoIcon className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-primary">New to Cecil?</p>
+              <p className="text-sm text-slate-600 mt-0.5">
+                Select a data file using the file browser below to begin sanitizing your data.
+                Cecil processes everything locally on your machine.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={dismissHelper}
+              className="flex-shrink-0 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+              aria-label="Dismiss helper"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* Main Content — conditional on page state */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {pageState === 'idle' && (
             <>
               <FilePickerCard
-                value={filePath}
-                onChange={setFilePath}
+                onFileSelect={handleFileSelect}
+                selectedFile={selectedFile}
                 disabled={isSubmitting || isScanning}
               />
               <FormatSelector
@@ -121,13 +177,15 @@ export function IngestPage() {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isSubmitting || isScanning || !filePath.trim()}
+                disabled={isSubmitting || isScanning || !selectedFile}
                 className={`
-                  px-6 py-3 rounded-lg font-medium text-white
-                  transition-colors duration-150
-                  ${isSubmitting || isScanning || !filePath.trim()
-                    ? 'bg-slate-300 cursor-not-allowed'
-                    : 'bg-accent hover:bg-indigo-700'
+                  px-6 py-3 rounded-lg font-medium
+                  transition-all duration-150 ease-out
+                  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
+                  active:scale-[0.98]
+                  ${isSubmitting || isScanning || !selectedFile
+                    ? 'bg-slate-200 text-slate-600 cursor-not-allowed'
+                    : 'bg-accent hover:bg-indigo-700 text-white'
                   }
                 `}
               >
@@ -194,5 +252,6 @@ export function IngestPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
