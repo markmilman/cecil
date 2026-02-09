@@ -179,13 +179,13 @@ export function IngestPage() {
                 onClick={handleSubmit}
                 disabled={isSubmitting || isScanning || !selectedFile}
                 className={`
-                  px-6 py-3 rounded-lg font-medium text-white
+                  px-6 py-3 rounded-lg font-medium
                   transition-all duration-150 ease-out
                   focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
                   active:scale-[0.98]
                   ${isSubmitting || isScanning || !selectedFile
-                    ? 'bg-slate-300 cursor-not-allowed'
-                    : 'bg-accent hover:bg-indigo-700'
+                    ? 'bg-slate-200 text-slate-600 cursor-not-allowed'
+                    : 'bg-accent hover:bg-indigo-700 text-white'
                   }
                 `}
               >

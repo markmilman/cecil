@@ -52,6 +52,14 @@ export function Shell({ children }: ShellProps) {
 
   return (
     <div className="flex h-full bg-slate-50">
+      {/* Skip Navigation Link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-indigo-600 focus:shadow-lg focus:rounded"
+      >
+        Skip to main content
+      </a>
+
       {/* Sidebar Navigation */}
       <aside className="w-64 bg-white border-r border-slate-200 shadow-lg">
         <div className="flex flex-col h-full">
@@ -73,6 +81,7 @@ export function Shell({ children }: ShellProps) {
                       className={`
                         flex items-center gap-3 px-4 py-3.5 rounded-lg
                         transition-all duration-200
+                        focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
                         ${
                           isActive
                             ? 'bg-indigo-50 text-accent border-l-4 border-accent font-semibold'
@@ -100,7 +109,7 @@ export function Shell({ children }: ShellProps) {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-auto">
+      <main id="main-content" className="flex-1 overflow-auto">
         {children}
       </main>
     </div>

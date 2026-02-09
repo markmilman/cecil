@@ -35,6 +35,7 @@ export function FormatSelector({ value, onChange, disabled = false }: FormatSele
                 className={`
                   flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer
                   transition-all duration-200
+                  focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-indigo-600
                   ${isSelected
                     ? 'border-accent bg-indigo-50 text-accent scale-105 shadow-md'
                     : 'border-slate-200 hover:border-indigo-200 hover:shadow-sm text-primary'

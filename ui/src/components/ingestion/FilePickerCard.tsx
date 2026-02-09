@@ -113,8 +113,9 @@ export function FilePickerCard({
               className={`
                 flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-white
                 transition-colors duration-150
+                focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
                 ${disabled
-                  ? 'bg-slate-300 cursor-not-allowed'
+                  ? 'bg-slate-200 text-slate-600 cursor-not-allowed'
                   : 'bg-accent hover:bg-indigo-700'
                 }
               `}
@@ -148,6 +149,7 @@ export function FilePickerCard({
                 disabled={disabled || !manualPath.trim()}
                 className={`
                   px-4 py-2 text-sm font-medium rounded-lg transition-colors
+                  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
                   ${disabled || !manualPath.trim()
                     ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                     : 'bg-slate-100 text-primary hover:bg-slate-200'
@@ -208,6 +210,7 @@ export function FilePickerCard({
             className={`
               flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg
               border border-slate-200 transition-colors
+              focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
               ${disabled
                 ? 'text-slate-400 cursor-not-allowed'
                 : 'text-primary hover:bg-slate-50'
