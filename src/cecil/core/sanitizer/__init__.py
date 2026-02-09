@@ -11,7 +11,7 @@ from cecil.core.sanitizer.models import (
     SanitizedRecord,
     StreamErrorPolicy,
 )
-from cecil.core.sanitizer.strategies import RedactionStrategy
+from cecil.core.sanitizer.strategies import RedactionStrategy, StrictStrategy
 
 
 __all__ = [
@@ -23,4 +23,5 @@ __all__ = [
     "RedactionStrategy",
     "SanitizedRecord",
     "StreamErrorPolicy",
+    "StrictStrategy",
 ]
