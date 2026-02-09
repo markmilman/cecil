@@ -19,10 +19,11 @@ interface NavItem {
 }
 
 /**
- * Shell layout component
+ * Shell layout component (v2)
  *
  * Provides the main layout structure with navigation sidebar and content area.
- * Uses Cecil design tokens: slate-900 for primary text/nav, indigo-600 for accents.
+ * V2 improvements: shadow-lg sidebar, left border accent on active nav items,
+ * improved spacing, and ARIA navigation landmark.
  */
 export function Shell({ children }: ShellProps) {
   const location = useLocation();
@@ -51,18 +52,26 @@ export function Shell({ children }: ShellProps) {
 
   return (
     <div className="flex h-full bg-slate-50">
+      {/* Skip Navigation Link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-indigo-600 focus:shadow-lg focus:rounded"
+      >
+        Skip to main content
+      </a>
+
       {/* Sidebar Navigation */}
-      <aside className="w-64 bg-white border-r border-slate-200">
+      <aside className="w-64 bg-white border-r border-slate-200 shadow-lg">
         <div className="flex flex-col h-full">
           {/* Logo/Header */}
           <div className="p-6 border-b border-slate-200">
-            <h1 className="text-2xl font-bold text-primary">Cecil</h1>
-            <p className="text-sm text-muted mt-1">Data Sanitizer & Cost Optimizer</p>
+            <h1 className="text-2xl font-extrabold text-primary">Cecil</h1>
+            <p className="text-sm text-slate-600 mt-1">Data Sanitizer & Cost Optimizer</p>
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex-1 p-4">
-            <ul className="space-y-2">
+          <nav className="flex-1 p-4" aria-label="Main navigation">
+            <ul className="space-y-1">
               {navItems.map((item) => {
                 const isActive = isActiveRoute(item.path);
                 return (
@@ -70,14 +79,16 @@ export function Shell({ children }: ShellProps) {
                     <Link
                       to={item.path}
                       className={`
-                        flex items-center gap-3 px-4 py-3 rounded-lg
-                        transition-colors duration-150
+                        flex items-center gap-3 px-4 py-3.5 rounded-lg
+                        transition-all duration-200
+                        focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
                         ${
                           isActive
-                            ? 'bg-accent text-white'
-                            : 'text-primary hover:bg-slate-100'
+                            ? 'bg-indigo-50 text-accent border-l-4 border-accent font-semibold'
+                            : 'text-primary hover:bg-slate-50 border-l-4 border-transparent'
                         }
                       `}
+                      aria-current={isActive ? 'page' : undefined}
                     >
                       {item.icon}
                       <span className="font-medium">{item.label}</span>
@@ -90,7 +101,7 @@ export function Shell({ children }: ShellProps) {
 
           {/* Footer */}
           <div className="p-4 border-t border-slate-200">
-            <p className="text-xs text-muted text-center">
+            <p className="text-xs text-slate-600 text-center">
               Local-First, Cloud-Optional
             </p>
           </div>
@@ -98,7 +109,7 @@ export function Shell({ children }: ShellProps) {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-auto">
+      <main id="main-content" className="flex-1 overflow-auto">
         {children}
       </main>
     </div>

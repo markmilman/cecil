@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance, type AxiosError } from 'axios';
-import type { ScanRequest, ScanResponse } from '@/types';
+import type { BrowseResponse, ScanRequest, ScanResponse } from '@/types';
 
 /**
  * Configuration for the API client
@@ -126,6 +126,28 @@ export class ApiClient {
   }
 
   /**
+   * Browse the filesystem for directories and files
+   *
+   * @param path - Directory path to browse (defaults to home directory)
+   * @param showAll - Include files with unsupported extensions
+   * @returns Browse response with directories and files
+   * @throws {ApiClientError} If the browse request fails
+   */
+  async browsePath(path?: string, showAll?: boolean): Promise<BrowseResponse> {
+    const params: Record<string, string> = {};
+    if (path !== undefined) {
+      params.path = path;
+    }
+    if (showAll !== undefined) {
+      params.show_all = String(showAll);
+    }
+    const response = await this.client.get<BrowseResponse>('/api/v1/filesystem/browse', {
+      params,
+    });
+    return response.data;
+  }
+
+  /**
    * Get the underlying Axios instance for custom requests
    *
    * @returns The configured Axios instance
@@ -136,11 +158,34 @@ export class ApiClient {
 }
 
 /**
+ * Detect the API base URL at runtime.
+ *
+ * When the React app is served by the FastAPI backend (production /
+ * single-binary mode), the API lives on the same origin — so the base
+ * URL is simply the current origin.  During Vite dev-server development
+ * the frontend runs on a different port and must be told where the API
+ * is via the ``VITE_API_PORT`` env var (defaults to 8000).
+ */
+function detectBaseURL(): string {
+  const envPort = import.meta.env.VITE_API_PORT;
+  if (envPort) {
+    return `http://127.0.0.1:${envPort}`;
+  }
+
+  // Served by FastAPI on the same origin — use relative URLs.
+  if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+    return window.location.origin;
+  }
+
+  return 'http://127.0.0.1:8000';
+}
+
+/**
  * Default API client instance
  *
- * This instance can be imported and used throughout the application.
- * The port can be overridden via environment variables if needed.
+ * When served from the Cecil binary the API is on the same origin;
+ * during development ``VITE_API_PORT`` overrides the port.
  */
 export const apiClient = new ApiClient({
-  port: Number(import.meta.env.VITE_API_PORT) || 8000,
+  baseURL: detectBaseURL(),
 });

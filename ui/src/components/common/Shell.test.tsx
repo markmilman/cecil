@@ -56,4 +56,44 @@ describe('Shell', () => {
 
     expect(screen.getByText('Local-First, Cloud-Optional')).toBeInTheDocument();
   });
+
+  it('renders a skip navigation link', () => {
+    render(
+      <BrowserRouter>
+        <Shell>
+          <div>Test content</div>
+        </Shell>
+      </BrowserRouter>
+    );
+
+    const skipLink = screen.getByText('Skip to main content');
+    expect(skipLink).toBeInTheDocument();
+    expect(skipLink).toHaveAttribute('href', '#main-content');
+  });
+
+  it('has main content landmark with id', () => {
+    render(
+      <BrowserRouter>
+        <Shell>
+          <div>Test content</div>
+        </Shell>
+      </BrowserRouter>
+    );
+
+    const main = screen.getByRole('main');
+    expect(main).toHaveAttribute('id', 'main-content');
+  });
+
+  it('has aria-label on navigation', () => {
+    render(
+      <BrowserRouter>
+        <Shell>
+          <div>Test content</div>
+        </Shell>
+      </BrowserRouter>
+    );
+
+    const nav = screen.getByRole('navigation');
+    expect(nav).toHaveAttribute('aria-label', 'Main navigation');
+  });
 });

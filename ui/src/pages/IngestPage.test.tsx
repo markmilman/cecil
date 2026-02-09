@@ -1,8 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { IngestPage } from './IngestPage';
 import { getErrorMessage } from '@/lib/errorMessages';
+
+// Mock the FileBrowserModal to avoid API calls
+vi.mock('@/components/ingestion/FileBrowserModal', () => ({
+  FileBrowserModal: ({ isOpen }: { isOpen: boolean }) => {
+    if (!isOpen) return null;
+    return <div data-testid="file-browser-modal" />;
+  },
+}));
 
 describe('IngestPage', () => {
   it('renders the page heading', () => {
@@ -10,9 +18,14 @@ describe('IngestPage', () => {
     expect(screen.getByText('File Ingestion')).toBeInTheDocument();
   });
 
-  it('renders the file picker', () => {
+  it('renders the file picker with Browse Files button', () => {
     render(<BrowserRouter><IngestPage /></BrowserRouter>);
-    expect(screen.getByLabelText('File Path')).toBeInTheDocument();
+    expect(screen.getByText('Browse Files')).toBeInTheDocument();
+  });
+
+  it('renders the file picker empty state heading', () => {
+    render(<BrowserRouter><IngestPage /></BrowserRouter>);
+    expect(screen.getByText('Select a Data File to Get Started')).toBeInTheDocument();
   });
 
   it('renders the format selector', () => {
@@ -25,7 +38,7 @@ describe('IngestPage', () => {
     expect(screen.getByText('Start Scan')).toBeInTheDocument();
   });
 
-  it('disables submit button when file path is empty', () => {
+  it('disables submit button when no file is selected', () => {
     render(<BrowserRouter><IngestPage /></BrowserRouter>);
     expect(screen.getByText('Start Scan')).toBeDisabled();
   });
