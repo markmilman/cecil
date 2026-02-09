@@ -8,6 +8,8 @@ import { useScanProgress } from '@/hooks/useScanProgress';
 import { apiClient } from '@/lib/apiClient';
 import { getErrorMessage } from '@/lib/errorMessages';
 import type { FileFormat } from '@/types';
+import type { SelectedFile } from '@/components/ingestion/FilePickerCard';
+import type { FileSelectionMetadata } from '@/components/ingestion/FileBrowserModal';
 import { ScanStatus } from '@/types';
 
 /**
@@ -19,20 +21,33 @@ import { ScanStatus } from '@/types';
  */
 export function IngestPage() {
   const navigate = useNavigate();
-  const [filePath, setFilePath] = useState('');
+  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [fileFormat, setFileFormat] = useState<FileFormat | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanId, setScanId] = useState<string | null>(null);
   const { progress, isConnected } = useScanProgress(scanId);
 
+  const handleFileSelect = (_path: string, metadata: FileSelectionMetadata) => {
+    setSelectedFile({
+      path: _path,
+      name: metadata.name,
+      size: metadata.size,
+      format: metadata.format,
+    });
+    // Auto-detect format from metadata if available
+    if (metadata.format) {
+      setFileFormat(metadata.format as FileFormat);
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!filePath.trim()) return;
+    if (!selectedFile) return;
     setIsSubmitting(true);
     setError(null);
     try {
       const response = await apiClient.createScan({
-        source: filePath,
+        source: selectedFile.path,
         file_format: fileFormat,
       });
       setScanId(response.scan_id);
@@ -70,7 +85,7 @@ export function IngestPage() {
   // Handler: reset state for a new scan
   const handleNewScan = () => {
     setScanId(null);
-    setFilePath('');
+    setSelectedFile(null);
     setFileFormat(null);
     setError(null);
   };
@@ -100,8 +115,8 @@ export function IngestPage() {
           {pageState === 'idle' && (
             <>
               <FilePickerCard
-                value={filePath}
-                onChange={setFilePath}
+                onFileSelect={handleFileSelect}
+                selectedFile={selectedFile}
                 disabled={isSubmitting || isScanning}
               />
               <FormatSelector
@@ -121,11 +136,11 @@ export function IngestPage() {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isSubmitting || isScanning || !filePath.trim()}
+                disabled={isSubmitting || isScanning || !selectedFile}
                 className={`
                   px-6 py-3 rounded-lg font-medium text-white
                   transition-colors duration-150
-                  ${isSubmitting || isScanning || !filePath.trim()
+                  ${isSubmitting || isScanning || !selectedFile
                     ? 'bg-slate-300 cursor-not-allowed'
                     : 'bg-accent hover:bg-indigo-700'
                   }
