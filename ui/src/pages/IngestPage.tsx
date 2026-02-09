@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { UploadIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { UploadIcon, CheckCircleIcon, AlertCircleIcon, RefreshCwIcon, ArrowRightIcon } from 'lucide-react';
 import { FilePickerCard } from '@/components/ingestion/FilePickerCard';
 import { FormatSelector } from '@/components/ingestion/FormatSelector';
 import { IngestionProgress } from '@/components/ingestion/IngestionProgress';
 import { useScanProgress } from '@/hooks/useScanProgress';
 import { apiClient } from '@/lib/apiClient';
+import { getErrorMessage } from '@/lib/errorMessages';
 import type { FileFormat } from '@/types';
 import { ScanStatus } from '@/types';
 
@@ -13,9 +15,10 @@ import { ScanStatus } from '@/types';
  *
  * Main page for file ingestion. Users select a local data file and optional format,
  * then initiate a scan. Real-time progress is displayed via WebSocket connection.
- * Enhanced success/error flows (#62) will be added later.
+ * Includes success/error flows and navigation guards (#62).
  */
 export function IngestPage() {
+  const navigate = useNavigate();
   const [filePath, setFilePath] = useState('');
   const [fileFormat, setFileFormat] = useState<FileFormat | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,9 +43,45 @@ export function IngestPage() {
     }
   };
 
+  // Determine the current page state
+  type PageState = 'idle' | 'scanning' | 'completed' | 'failed';
+  const pageState: PageState = (() => {
+    if (!scanId || !progress) return scanId ? 'scanning' : 'idle';
+    if (progress.status === ScanStatus.COMPLETED) return 'completed';
+    if (progress.status === ScanStatus.FAILED) return 'failed';
+    return 'scanning';
+  })();
+
   // Determine if a scan is currently active (not in a terminal state)
-  const isScanning = scanId !== null && progress !== null &&
-    progress.status !== ScanStatus.COMPLETED && progress.status !== ScanStatus.FAILED;
+  const isScanning = pageState === 'scanning';
+
+  // Navigation guard: warn before closing browser tab/window during scan
+  useEffect(() => {
+    if (pageState === 'scanning') {
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+        e.returnValue = '';
+      };
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }
+  }, [pageState]);
+
+  // Handler: reset state for a new scan
+  const handleNewScan = () => {
+    setScanId(null);
+    setFilePath('');
+    setFileFormat(null);
+    setError(null);
+  };
+
+  // Handler: retry the current scan
+  const handleRetry = async () => {
+    setScanId(null);
+    setError(null);
+    // Brief delay to allow state cleanup before re-submitting
+    await handleSubmit();
+  };
 
   return (
     <div className="p-8">
@@ -56,47 +95,102 @@ export function IngestPage() {
           Select a local data file to sanitize. Supported formats: JSONL, CSV, and Parquet.
         </p>
 
-        {/* File Picker + Format Selector */}
+        {/* Main Content — conditional on page state */}
         <div className="space-y-6">
-          <FilePickerCard
-            value={filePath}
-            onChange={setFilePath}
-            disabled={isSubmitting || isScanning}
-          />
-          <FormatSelector
-            value={fileFormat}
-            onChange={setFileFormat}
-            disabled={isSubmitting || isScanning}
-          />
+          {pageState === 'idle' && (
+            <>
+              <FilePickerCard
+                value={filePath}
+                onChange={setFilePath}
+                disabled={isSubmitting || isScanning}
+              />
+              <FormatSelector
+                value={fileFormat}
+                onChange={setFileFormat}
+                disabled={isSubmitting || isScanning}
+              />
 
-          {/* Error display (basic — will be enhanced in #62) */}
-          {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-danger text-sm">
-              {error}
-            </div>
+              {/* Error display (API submission errors only) */}
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-danger text-sm">
+                  {error}
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting || isScanning || !filePath.trim()}
+                className={`
+                  px-6 py-3 rounded-lg font-medium text-white
+                  transition-colors duration-150
+                  ${isSubmitting || isScanning || !filePath.trim()
+                    ? 'bg-slate-300 cursor-not-allowed'
+                    : 'bg-accent hover:bg-indigo-700'
+                  }
+                `}
+              >
+                {isSubmitting ? 'Starting Scan...' : 'Start Scan'}
+              </button>
+            </>
           )}
 
-          {/* Progress display */}
-          {scanId && (
+          {pageState === 'scanning' && (
             <IngestionProgress progress={progress} isConnected={isConnected} />
           )}
 
-          {/* Submit Button */}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting || isScanning || !filePath.trim()}
-            className={`
-              px-6 py-3 rounded-lg font-medium text-white
-              transition-colors duration-150
-              ${isSubmitting || isScanning || !filePath.trim()
-                ? 'bg-slate-300 cursor-not-allowed'
-                : 'bg-accent hover:bg-indigo-700'
-              }
-            `}
-          >
-            {isSubmitting ? 'Starting Scan...' : 'Start Scan'}
-          </button>
+          {pageState === 'completed' && progress && (
+            <div className="bg-white border border-emerald-200 rounded-lg p-8 text-center">
+              <CheckCircleIcon className="h-12 w-12 text-emerald-500 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-primary mb-2">Scan Complete</h2>
+              <p className="text-muted mb-6">
+                <span className="font-medium text-primary">{progress.records_processed.toLocaleString()}</span> records processed
+              </p>
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => navigate('/audit')}
+                  className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors duration-150"
+                >
+                  View Audit Results
+                  <ArrowRightIcon className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNewScan}
+                  className="px-6 py-3 border border-slate-200 text-primary hover:bg-slate-50 rounded-lg font-medium transition-colors duration-150"
+                >
+                  Start New Scan
+                </button>
+              </div>
+            </div>
+          )}
+
+          {pageState === 'failed' && progress && (
+            <div className="bg-white border border-red-200 rounded-lg p-8 text-center">
+              <AlertCircleIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-primary mb-2">Scan Failed</h2>
+              <p className="text-muted mb-6">{getErrorMessage(progress.error_type)}</p>
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors duration-150"
+                >
+                  <RefreshCwIcon className="h-4 w-4" />
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNewScan}
+                  className="px-6 py-3 border border-slate-200 text-primary hover:bg-slate-50 rounded-lg font-medium transition-colors duration-150"
+                >
+                  Change File
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
