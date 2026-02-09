@@ -583,3 +583,33 @@ class TestStrictStrategyIsRedactionStrategy:
         from cecil.core.sanitizer.strategies import RedactionStrategy
 
         assert isinstance(strategy, RedactionStrategy)
+
+
+# -- Coverage: mapping returns None guard (line 188) -------------------------
+
+
+class TestScanValueMappingReturnsNone:
+    """When FieldMapping.get() returns None, scan_value defaults to REDACT."""
+
+    def test_scan_value_none_action_defaults_to_redact(self) -> None:
+        mapping = FieldMapping({})
+        mapping._mappings["broken"] = None  # type: ignore[assignment]
+        s = StrictStrategy(mapping=mapping)
+        detections = s.scan_value("broken", "value")
+        assert len(detections) == 1
+        assert detections[0].entity_type == "REDACT"
+
+
+# -- Coverage: unknown entity_type fallback (line 244) -----------------------
+
+
+class TestRedactUnknownActionFallback:
+    """When detection has unrecognised entity_type, redact returns value."""
+
+    def test_redact_unknown_action_returns_original(self) -> None:
+        from cecil.core.sanitizer.models import Detection
+
+        mapping = FieldMapping({"f": RedactionAction.REDACT})
+        s = StrictStrategy(mapping=mapping)
+        dets = [Detection(entity_type="UNKNOWN", start=0, end=5, score=1.0)]
+        assert s.redact("hello", dets) == "hello"

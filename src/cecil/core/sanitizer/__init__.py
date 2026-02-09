@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from cecil.core.sanitizer.engine import SanitizationEngine
 from cecil.core.sanitizer.models import (
     Detection,
     FieldMapping,
@@ -26,6 +27,7 @@ __all__ = [
     "RedactionAction",
     "RedactionAudit",
     "RedactionStrategy",
+    "SanitizationEngine",
     "SanitizedRecord",
     "StreamErrorPolicy",
     "StrictStrategy",

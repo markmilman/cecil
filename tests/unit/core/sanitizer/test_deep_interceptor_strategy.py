@@ -595,3 +595,65 @@ class TestNonStringValueCoercion:
     ) -> None:
         detections = strategy.scan_value("flag", True)
         assert isinstance(detections, list)
+
+
+# -- Coverage: invalid JSON string (lines 479-480) --------------------------
+
+
+class TestInvalidJsonStringHandling:
+    """Verify _to_scannable_string handles malformed JSON gracefully."""
+
+    @pytest.fixture()
+    def strategy(self) -> DeepInterceptorStrategy:
+        """Return a DeepInterceptorStrategy instance."""
+        return DeepInterceptorStrategy()
+
+    def test_invalid_json_string_starting_with_brace(
+        self,
+        strategy: DeepInterceptorStrategy,
+    ) -> None:
+        """A string starting with '{' that is not valid JSON is scanned as-is."""
+        detections = strategy.scan_value("field", "{not-valid-json!!!")
+        assert isinstance(detections, list)
+
+    def test_invalid_json_string_starting_with_bracket(
+        self,
+        strategy: DeepInterceptorStrategy,
+    ) -> None:
+        """A string starting with '[' that is not valid JSON is scanned as-is."""
+        detections = strategy.scan_value("field", "[broken json")
+        assert isinstance(detections, list)
+
+
+# -- Coverage: _run_presidio empty text (line 494) ---------------------------
+
+
+class TestRunPresidioEmptyText:
+    """Verify _run_presidio returns empty list for empty text."""
+
+    def test_empty_string_returns_no_detections(self) -> None:
+        strategy = DeepInterceptorStrategy()
+        strategy._ensure_analyzer()
+        result = strategy._run_presidio("")
+        assert result == []
+
+
+# -- Coverage: _deduplicate replacement (line 570) ---------------------------
+
+
+class TestDeduplicateOverlapReplacement:
+    """Verify overlapping detection with higher score replaces earlier one."""
+
+    def test_higher_score_replaces_lower_score_overlap(self) -> None:
+        low = Detection(entity_type="LOW", start=0, end=10, score=0.5)
+        high = Detection(entity_type="HIGH", start=5, end=15, score=0.9)
+        result = DeepInterceptorStrategy._deduplicate([low, high])
+        assert len(result) == 1
+        assert result[0].entity_type == "HIGH"
+
+    def test_same_score_longer_span_replaces_shorter(self) -> None:
+        short = Detection(entity_type="SHORT", start=0, end=5, score=0.8)
+        long = Detection(entity_type="LONG", start=0, end=10, score=0.8)
+        result = DeepInterceptorStrategy._deduplicate([short, long])
+        assert len(result) == 1
+        assert result[0].entity_type == "LONG"
