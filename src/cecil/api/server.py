@@ -18,6 +18,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from cecil.api.routes.scans import router as scans_router
 from cecil.api.schemas import ErrorResponse, HealthResponse
 from cecil.utils.errors import ServerStartupError
 
@@ -64,6 +65,8 @@ def create_app() -> FastAPI:
     async def health() -> HealthResponse:
         """Return server health status."""
         return HealthResponse(status="ok", version=_CECIL_VERSION)
+
+    application.include_router(scans_router)
 
     return application
 
