@@ -11,10 +11,15 @@ from cecil.core.sanitizer.models import (
     SanitizedRecord,
     StreamErrorPolicy,
 )
-from cecil.core.sanitizer.strategies import RedactionStrategy, StrictStrategy
+from cecil.core.sanitizer.strategies import (
+    DeepInterceptorStrategy,
+    RedactionStrategy,
+    StrictStrategy,
+)
 
 
 __all__ = [
+    "DeepInterceptorStrategy",
     "Detection",
     "FieldMapping",
     "FieldRedaction",
