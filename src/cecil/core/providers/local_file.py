@@ -542,7 +542,7 @@ class LocalFileProvider(BaseDataProvider):
             ProviderReadError: If the Parquet file cannot be read.
         """
         try:
-            import pyarrow.parquet as pq  # type: ignore[import-not-found]
+            import pyarrow.parquet as pq  # type: ignore  # optional dep: untyped or absent
         except ImportError as err:
             raise ProviderDependencyError(
                 "Parquet support requires pyarrow. Install with: pip install pyarrow",
