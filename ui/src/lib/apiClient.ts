@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type AxiosError } from 'axios';
+import type { ScanRequest, ScanResponse } from '@/types';
 
 /**
  * Configuration for the API client
@@ -97,6 +98,30 @@ export class ApiClient {
    */
   async healthCheck(): Promise<HealthCheckResponse> {
     const response = await this.client.get<HealthCheckResponse>('/api/v1/health');
+    return response.data;
+  }
+
+  /**
+   * Create a new scan operation
+   *
+   * @param request - Scan request payload
+   * @returns Scan response with scan ID and initial status
+   * @throws {ApiClientError} If the scan creation fails
+   */
+  async createScan(request: ScanRequest): Promise<ScanResponse> {
+    const response = await this.client.post<ScanResponse>('/api/v1/scans', request);
+    return response.data;
+  }
+
+  /**
+   * Get the status and details of an existing scan
+   *
+   * @param scanId - Unique scan identifier
+   * @returns Scan response with current status and progress
+   * @throws {ApiClientError} If the scan retrieval fails
+   */
+  async getScan(scanId: string): Promise<ScanResponse> {
+    const response = await this.client.get<ScanResponse>(`/api/v1/scans/${scanId}`);
     return response.data;
   }
 
