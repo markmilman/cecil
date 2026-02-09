@@ -2,22 +2,26 @@ import { useState } from 'react';
 import { UploadIcon } from 'lucide-react';
 import { FilePickerCard } from '@/components/ingestion/FilePickerCard';
 import { FormatSelector } from '@/components/ingestion/FormatSelector';
+import { IngestionProgress } from '@/components/ingestion/IngestionProgress';
+import { useScanProgress } from '@/hooks/useScanProgress';
 import { apiClient } from '@/lib/apiClient';
-import type { FileFormat, ScanResponse } from '@/types';
+import type { FileFormat } from '@/types';
+import { ScanStatus } from '@/types';
 
 /**
  * IngestPage component
  *
  * Main page for file ingestion. Users select a local data file and optional format,
- * then initiate a scan. This initial version handles basic scan creation.
- * Progress tracking (#61) and enhanced success/error flows (#62) will be added later.
+ * then initiate a scan. Real-time progress is displayed via WebSocket connection.
+ * Enhanced success/error flows (#62) will be added later.
  */
 export function IngestPage() {
   const [filePath, setFilePath] = useState('');
   const [fileFormat, setFileFormat] = useState<FileFormat | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [scanResponse, setScanResponse] = useState<ScanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [scanId, setScanId] = useState<string | null>(null);
+  const { progress, isConnected } = useScanProgress(scanId);
 
   const handleSubmit = async () => {
     if (!filePath.trim()) return;
@@ -28,13 +32,17 @@ export function IngestPage() {
         source: filePath,
         file_format: fileFormat,
       });
-      setScanResponse(response);
+      setScanId(response.scan_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Determine if a scan is currently active (not in a terminal state)
+  const isScanning = scanId !== null && progress !== null &&
+    progress.status !== ScanStatus.COMPLETED && progress.status !== ScanStatus.FAILED;
 
   return (
     <div className="p-8">
@@ -53,12 +61,12 @@ export function IngestPage() {
           <FilePickerCard
             value={filePath}
             onChange={setFilePath}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isScanning}
           />
           <FormatSelector
             value={fileFormat}
             onChange={setFileFormat}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isScanning}
           />
 
           {/* Error display (basic — will be enhanced in #62) */}
@@ -68,24 +76,20 @@ export function IngestPage() {
             </div>
           )}
 
-          {/* Scan result placeholder (basic — will be enhanced in #61/#62) */}
-          {scanResponse && (
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm">
-              <p className="text-primary font-medium">Scan initiated</p>
-              <p className="text-muted">Scan ID: {scanResponse.scan_id}</p>
-              <p className="text-muted">Status: {scanResponse.status}</p>
-            </div>
+          {/* Progress display */}
+          {scanId && (
+            <IngestionProgress progress={progress} isConnected={isConnected} />
           )}
 
           {/* Submit Button */}
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting || !filePath.trim()}
+            disabled={isSubmitting || isScanning || !filePath.trim()}
             className={`
               px-6 py-3 rounded-lg font-medium text-white
               transition-colors duration-150
-              ${isSubmitting || !filePath.trim()
+              ${isSubmitting || isScanning || !filePath.trim()
                 ? 'bg-slate-300 cursor-not-allowed'
                 : 'bg-accent hover:bg-indigo-700'
               }
