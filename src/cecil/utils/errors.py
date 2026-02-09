@@ -37,6 +37,10 @@ class SanitizationError(CecilError):
     """Errors during PII detection or redaction."""
 
 
+class RecordSanitizationError(SanitizationError):
+    """A single record failed during streaming sanitization."""
+
+
 # ── Output stage ───────────────────────────────────────────────────────
 
 
