@@ -7,6 +7,8 @@ audit records, and error-handling policies.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -214,3 +216,74 @@ class FieldMapping:
         if not isinstance(other, FieldMapping):
             return NotImplemented
         return self._mappings == other._mappings
+
+
+@dataclass(frozen=True)
+class FieldMappingEntry:
+    """Configuration for a single field in a mapping.
+
+    Attributes:
+        action: The redaction action to apply.
+        options: Action-specific options (e.g., preserve_domain for MASK).
+    """
+
+    action: RedactionAction
+    options: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class MappingConfig:
+    """A fully parsed and validated mapping configuration.
+
+    Attributes:
+        version: The schema version (currently only 1 supported).
+        default_action: The action to apply to unmapped fields.
+        fields: A mapping of field names to their FieldMappingEntry configs.
+    """
+
+    version: int
+    default_action: RedactionAction
+    fields: dict[str, FieldMappingEntry]
+
+    def policy_hash(self) -> str:
+        """Compute a SHA-256 hash of this mapping configuration.
+
+        Returns a deterministic hex digest that uniquely identifies
+        the mapping rules for SaaS verification.
+        """
+        entries: list[tuple[str, str, str]] = []
+        for name in sorted(self.fields):
+            entry = self.fields[name]
+            entries.append(
+                (name, entry.action.value, json.dumps(entry.options, sort_keys=True)),
+            )
+        payload = json.dumps(
+            {
+                "version": self.version,
+                "default_action": self.default_action.value,
+                "fields": entries,
+            },
+            sort_keys=True,
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class MappingValidationResult:
+    """Result of validating a MappingConfig against a sample record.
+
+    Attributes:
+        matched_fields: Fields present in both mapping and record.
+        unmapped_fields: Fields in the record but not in the mapping.
+        missing_fields: Fields in the mapping but not in the record.
+        is_valid: True when there are no missing fields.
+    """
+
+    matched_fields: list[str]
+    unmapped_fields: list[str]
+    missing_fields: list[str]
+
+    @property
+    def is_valid(self) -> bool:
+        """Return True if there are no missing_fields."""
+        return len(self.missing_fields) == 0

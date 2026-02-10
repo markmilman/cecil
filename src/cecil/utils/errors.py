@@ -41,6 +41,18 @@ class RecordSanitizationError(SanitizationError):
     """A single record failed during streaming sanitization."""
 
 
+class MappingError(SanitizationError):
+    """Base error for mapping configuration issues."""
+
+
+class MappingValidationError(MappingError):
+    """The mapping file has invalid schema or content."""
+
+
+class MappingFileError(MappingError):
+    """Cannot read or parse the mapping file (I/O or YAML syntax)."""
+
+
 # ── Output stage ───────────────────────────────────────────────────────
 
 
