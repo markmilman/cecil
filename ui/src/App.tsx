@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
 import { Shell } from '@/components/common/Shell';
 import { DashboardPage } from '@/pages/DashboardPage';
+import { WizardContainer } from '@/components/wizard/WizardContainer';
 
 import type { ActiveView } from '@/types';
 
@@ -46,17 +47,7 @@ export function App() {
             <DashboardPage onStartWizard={handleStartWizard} />
           )}
           {activeView === 'wizard' && (
-            <div>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleBackToDashboard}
-                style={{ marginBottom: '24px' }}
-              >
-                Back to Dashboard
-              </button>
-              {/* Wizard steps will be added by subsequent sub-issues */}
-            </div>
+            <WizardContainer onBackToDashboard={handleBackToDashboard} />
           )}
         </div>
       </Shell>
