@@ -7,8 +7,9 @@ from typing import Any
 
 import pytest
 
-from cecil.core.sanitizer.mapping import MappingParser
+from cecil.core.sanitizer.mapping import MappingParser, validate_mapping_against_record
 from cecil.core.sanitizer.models import (
+    FieldMappingEntry,
     MappingConfig,
     RedactionAction,
 )
@@ -315,3 +316,135 @@ class TestParseDict:
         data = _valid_data(fields={"email": {"action": 42}})
         with pytest.raises(MappingValidationError, match="expected a string"):
             parser.parse_dict(data)
+
+
+# -- Validation against sample records --------------------------------------
+
+
+def _make_config(
+    field_names: list[str],
+    *,
+    default_action: RedactionAction = RedactionAction.REDACT,
+) -> MappingConfig:
+    """Build a MappingConfig with the given field names (all REDACT)."""
+    return MappingConfig(
+        version=1,
+        default_action=default_action,
+        fields={name: FieldMappingEntry(action=RedactionAction.REDACT) for name in field_names},
+    )
+
+
+class TestValidateMappingAgainstRecord:
+    """Tests for validate_mapping_against_record()."""
+
+    def test_validate_all_fields_match_returns_valid(self) -> None:
+        """When mapping and record share all keys, result is valid."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={
+                "email": FieldMappingEntry(action=RedactionAction.MASK),
+                "name": FieldMappingEntry(action=RedactionAction.REDACT),
+            },
+        )
+        record = {"email": "test@example.com", "name": "John"}
+        result = validate_mapping_against_record(config, record)
+
+        assert result.is_valid is True
+        assert result.matched_fields == ["email", "name"]
+        assert result.unmapped_fields == []
+        assert result.missing_fields == []
+
+    def test_validate_mapping_field_not_in_record_appears_in_missing(self) -> None:
+        """A mapping field absent from the record is reported as missing."""
+        config = _make_config(["email", "ssn"])
+        record = {"email": "test@example.com"}
+        result = validate_mapping_against_record(config, record)
+
+        assert result.is_valid is False
+        assert "ssn" in result.missing_fields
+        assert "email" in result.matched_fields
+        assert result.unmapped_fields == []
+
+    def test_validate_record_field_not_in_mapping_appears_in_unmapped(self) -> None:
+        """A record field absent from the mapping is reported as unmapped."""
+        config = _make_config(["email"])
+        record = {"email": "test@example.com", "phone": "555-0100"}
+        result = validate_mapping_against_record(config, record)
+
+        assert result.is_valid is True
+        assert "phone" in result.unmapped_fields
+        assert result.matched_fields == ["email"]
+        assert result.missing_fields == []
+
+    def test_validate_partial_overlap_reports_all_categories(self) -> None:
+        """When there is partial overlap, all three categories are populated."""
+        config = _make_config(["email", "ssn", "dob"])
+        record = {"email": "a@b.com", "phone": "555-0100", "address": "123 Main"}
+        result = validate_mapping_against_record(config, record)
+
+        assert result.is_valid is False
+        assert result.matched_fields == ["email"]
+        assert result.unmapped_fields == ["address", "phone"]
+        assert result.missing_fields == ["dob", "ssn"]
+
+    def test_validate_empty_mapping_fields_returns_valid(self) -> None:
+        """A mapping with no fields (constructed directly) is always valid."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={},
+        )
+        record = {"email": "test@example.com", "name": "John"}
+        result = validate_mapping_against_record(config, record)
+
+        assert result.is_valid is True
+        assert result.matched_fields == []
+        assert result.unmapped_fields == ["email", "name"]
+        assert result.missing_fields == []
+
+    def test_validate_empty_record_reports_all_mapping_fields_missing(self) -> None:
+        """An empty record means every mapping field is missing."""
+        config = _make_config(["email", "name"])
+        record: dict[str, str] = {}
+        result = validate_mapping_against_record(config, record)
+
+        assert result.is_valid is False
+        assert result.matched_fields == []
+        assert result.unmapped_fields == []
+        assert result.missing_fields == ["email", "name"]
+
+    def test_validate_no_overlap_reports_all_unmapped_and_missing(self) -> None:
+        """Completely disjoint fields populate both unmapped and missing."""
+        config = _make_config(["ssn", "dob"])
+        record = {"phone": "555-0100", "address": "123 Main"}
+        result = validate_mapping_against_record(config, record)
+
+        assert result.is_valid is False
+        assert result.matched_fields == []
+        assert result.unmapped_fields == ["address", "phone"]
+        assert result.missing_fields == ["dob", "ssn"]
+
+    def test_validate_matched_fields_are_sorted(self) -> None:
+        """Matched fields are returned in sorted order."""
+        config = _make_config(["zebra", "apple", "mango"])
+        record = {"zebra": "z", "apple": "a", "mango": "m"}
+        result = validate_mapping_against_record(config, record)
+
+        assert result.matched_fields == ["apple", "mango", "zebra"]
+
+    def test_validate_unmapped_fields_are_sorted(self) -> None:
+        """Unmapped fields are returned in sorted order."""
+        config = _make_config(["x"])
+        record = {"x": "1", "zebra": "z", "apple": "a", "mango": "m"}
+        result = validate_mapping_against_record(config, record)
+
+        assert result.unmapped_fields == ["apple", "mango", "zebra"]
+
+    def test_validate_missing_fields_are_sorted(self) -> None:
+        """Missing fields are returned in sorted order."""
+        config = _make_config(["zebra", "apple", "mango"])
+        record: dict[str, str] = {}
+        result = validate_mapping_against_record(config, record)
+
+        assert result.missing_fields == ["apple", "mango", "zebra"]

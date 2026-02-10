@@ -10,7 +10,7 @@ from cecil.core.sanitizer.actions import (
     apply_redact,
 )
 from cecil.core.sanitizer.engine import SanitizationEngine
-from cecil.core.sanitizer.mapping import MappingParser
+from cecil.core.sanitizer.mapping import MappingParser, validate_mapping_against_record
 from cecil.core.sanitizer.models import (
     Detection,
     FieldMapping,
@@ -51,4 +51,5 @@ __all__ = [
     "apply_keep",
     "apply_mask",
     "apply_redact",
+    "validate_mapping_against_record",
 ]

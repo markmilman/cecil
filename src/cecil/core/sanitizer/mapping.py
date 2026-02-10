@@ -16,6 +16,7 @@ import yaml
 from cecil.core.sanitizer.models import (
     FieldMappingEntry,
     MappingConfig,
+    MappingValidationResult,
     RedactionAction,
 )
 from cecil.utils.errors import MappingFileError, MappingValidationError
@@ -191,3 +192,50 @@ class MappingParser:
             raise MappingValidationError(
                 f"Invalid action '{value}' for {context}; valid actions: {valid}",
             ) from None
+
+
+def validate_mapping_against_record(
+    config: MappingConfig,
+    record: dict[str, Any],
+) -> MappingValidationResult:
+    """Validate a mapping configuration against a sample record.
+
+    Compares the field names defined in the mapping with the keys
+    present in the sample record to identify:
+
+    - matched_fields: fields in both the mapping and the record
+    - unmapped_fields: fields in the record but not in the mapping
+    - missing_fields: fields in the mapping but not in the record
+
+    This pre-validation step ensures the mapping is compatible with
+    the actual data schema before processing the full dataset.
+
+    Args:
+        config: The parsed mapping configuration.
+        record: A sample data record (dict with string keys).
+
+    Returns:
+        A MappingValidationResult with match/unmatch/missing field lists.
+    """
+    mapping_fields = set(config.fields.keys())
+    record_fields = set(record.keys())
+
+    matched = sorted(mapping_fields & record_fields)
+    unmapped = sorted(record_fields - mapping_fields)
+    missing = sorted(mapping_fields - record_fields)
+
+    result = MappingValidationResult(
+        matched_fields=matched,
+        unmapped_fields=unmapped,
+        missing_fields=missing,
+    )
+
+    logger.debug(
+        "mapping_validation matched=%d unmapped=%d missing=%d is_valid=%s",
+        len(matched),
+        len(unmapped),
+        len(missing),
+        result.is_valid,
+    )
+
+    return result
