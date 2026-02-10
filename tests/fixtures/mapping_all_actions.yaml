@@ -1,0 +1,13 @@
+version: 1
+default_action: REDACT
+
+fields:
+  email:
+    action: MASK
+    preserve_domain: true
+  password:
+    action: REDACT
+  user_id:
+    action: HASH
+  model_name:
+    action: KEEP

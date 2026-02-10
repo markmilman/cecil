@@ -1,0 +1,5 @@
+version: 99
+
+fields:
+  email:
+    action: MASK
