@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+from cecil.core.sanitizer.actions import (
+    apply_action,
+    apply_hash,
+    apply_keep,
+    apply_mask,
+    apply_redact,
+)
 from cecil.core.sanitizer.engine import SanitizationEngine
 from cecil.core.sanitizer.mapping import MappingParser
 from cecil.core.sanitizer.models import (
@@ -39,4 +46,9 @@ __all__ = [
     "SanitizedRecord",
     "StreamErrorPolicy",
     "StrictStrategy",
+    "apply_action",
+    "apply_hash",
+    "apply_keep",
+    "apply_mask",
+    "apply_redact",
 ]
