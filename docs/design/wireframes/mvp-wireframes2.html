@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cecil Modern Wireframes</title>
+    <style>
+        :root {
+            --bg-color: #F3F4F6;
+            --text-primary: #111827;
+            --text-secondary: #6B7280;
+            --card-bg: #FFFFFF;
+            --border-color: #E5E7EB;
+            --accent-blue: #4F46E5;
+            --success-green: #10B981;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 60px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 80px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 600px;
+            line-height: 1.5;
+        }
+
+        .design-container {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .meta-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+
+        .view-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .view-tag {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            background: #E5E7EB;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-family: monospace;
+        }
+
+        svg {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 12px;
+            background: white;
+            border: 1px solid var(--border-color);
+        }
+
+        .note {
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            color: #1E40AF;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div style="text-align: center;">
+        <h1>Cecil v2: Modern Infrastructure UI</h1>
+        <p class="subtitle">Updated workflow emphasizing batch processing, sanitization terminology, and the bridge to cost analysis.</p>
+    </div>
+
+    <!-- View 1: Initial Upload State -->
+    <div class="design-container">
+        <div class="meta-header">
+            <span class="view-title">1. Multi-File Ingestion</span>
+            <span class="view-tag">US.1 Batch Upload</span>
+        </div>
+        
+        <svg width="1000" height="600" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#FFFFFF"/>
+            
+            <g transform="translate(60, 60)">
+                <rect width="40" height="40" rx="8" fill="#EEF2FF"/>
+                <path d="M20 10 L20 30 M10 20 L30 20" stroke="#4F46E5" stroke-width="2" stroke-linecap="round"/>
+                <text x="56" y="28" font-family="sans-serif" font-size="24" font-weight="700" fill="#111827">File Ingestion</text>
+                
+                <!-- Trust Badge -->
+                <g transform="translate(740, 0)">
+                     <rect width="140" height="32" rx="16" fill="#ECFDF5"/>
+                     <path d="M20 10 V8 A4 4 0 0 1 28 8 V10" stroke="#059669" stroke-width="2" fill="none"/>
+                     <rect x="16" y="10" width="16" height="12" rx="2" stroke="#059669" stroke-width="2" fill="none"/>
+                     <text x="40" y="21" font-family="sans-serif" font-size="12" font-weight="600" fill="#059669">Data stays local</text>
+                </g>
+
+                <text x="0" y="70" font-family="sans-serif" font-size="16" fill="#6B7280">Select local data files to sanitize. No data leaves your device.</text>
+            </g>
+
+            <g transform="translate(60, 160)">
+                <rect width="880" height="320" rx="12" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="2" stroke-dasharray="8 8"/>
+                <g transform="translate(440, 140)">
+                    <!-- Stacked Files Icon -->
+                    <rect x="-10" y="-45" width="20" height="24" rx="2" fill="#C7D2FE" stroke="#4F46E5"/>
+                    <rect x="-5" y="-40" width="20" height="24" rx="2" fill="#A5B4FC" stroke="#4F46E5"/>
+                    <rect x="0" y="-35" width="20" height="24" rx="2" fill="#EEF2FF" stroke="#4F46E5"/>
+                    
+                    <text x="0" y="24" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="600" fill="#111827">Drag and drop log files</text>
+                    <text x="0" y="48" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#6B7280">Process multiple files (JSONL, CSV, Parquet)</text>
+                    
+                    <rect x="-70" y="76" width="140" height="40" rx="6" fill="#4F46E5"/>
+                    <text x="0" y="101" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="600" fill="#FFFFFF">Browse Files</text>
+                </g>
+            </g>
+        </svg>
+    </div>
+
+    <!-- View 2: Batch Selection (Updated Color) -->
+    <div class="design-container">
+        <div class="meta-header">
+            <span class="view-title">2. Files Queued (Ready)</span>
+            <span class="view-tag">US.1 Pre-Processing</span>
+        </div>
+        
+        <svg width="1000" height="600" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#FFFFFF"/>
+            
+            <g transform="translate(60, 60)">
+                <text x="0" y="28" font-family="sans-serif" font-size="24" font-weight="700" fill="#111827">3 Files Selected</text>
+                <text x="0" y="60" font-family="sans-serif" font-size="16" fill="#6B7280">Review your selection before starting sanitization.</text>
+                 <!-- Trust Badge -->
+                 <g transform="translate(740, 0)">
+                    <rect width="140" height="32" rx="16" fill="#ECFDF5"/>
+                    <text x="40" y="21" font-family="sans-serif" font-size="12" font-weight="600" fill="#059669">Data stays local</text>
+                     <path d="M20 10 V8 A4 4 0 0 1 28 8 V10" stroke="#059669" stroke-width="2" fill="none"/>
+                     <rect x="16" y="10" width="16" height="12" rx="2" stroke="#059669" stroke-width="2" fill="none"/>
+               </g>
+            </g>
+
+            <!-- File List -->
+            <g transform="translate(60, 140)">
+                <!-- File 1 -->
+                <rect width="880" height="70" rx="8" fill="#F9FAFB" stroke="#E5E7EB"/>
+                <text x="20" y="40" font-size="20">📄</text>
+                <text x="60" y="30" font-family="sans-serif" font-size="14" font-weight="600" fill="#111827">aws-billing-jan.csv</text>
+                <text x="60" y="50" font-family="sans-serif" font-size="12" fill="#6B7280">12.4 MB • CSV</text>
+                <text x="840" y="40" font-family="sans-serif" font-size="14" fill="#6B7280" cursor="pointer">✕</text>
+
+                <!-- File 2 -->
+                <rect y="80" width="880" height="70" rx="8" fill="#F9FAFB" stroke="#E5E7EB"/>
+                <text x="20" y="120" font-size="20">📄</text>
+                <text x="60" y="110" font-family="sans-serif" font-size="14" font-weight="600" fill="#111827">app-logs-prod.jsonl</text>
+                <text x="60" y="130" font-family="sans-serif" font-size="12" fill="#6B7280">45.1 MB • JSONL</text>
+                <text x="840" y="120" font-family="sans-serif" font-size="14" fill="#6B7280" cursor="pointer">✕</text>
+
+                <!-- File 3 -->
+                <rect y="160" width="880" height="70" rx="8" fill="#F9FAFB" stroke="#E5E7EB"/>
+                <text x="20" y="200" font-size="20">📄</text>
+                <text x="60" y="190" font-family="sans-serif" font-size="14" font-weight="600" fill="#111827">user-db-export.parquet</text>
+                <text x="60" y="210" font-family="sans-serif" font-size="12" fill="#6B7280">8.2 MB • Parquet</text>
+                <text x="840" y="200" font-family="sans-serif" font-size="14" fill="#6B7280" cursor="pointer">✕</text>
+            </g>
+
+            <!-- Action Footer -->
+            <g transform="translate(60, 480)">
+                <rect width="880" height="1" fill="#E5E7EB"/>
+                <text x="0" y="45" font-family="sans-serif" font-size="14" fill="#6B7280">Total Size: <tspan font-weight="bold" fill="#111827">65.7 MB</tspan></text>
+                
+                <!-- CHANGED: Color updated to Purple #4F46E5 -->
+                <rect x="680" y="15" width="200" height="44" rx="6" fill="#4F46E5"/>
+                <text x="780" y="42" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="600" fill="#FFFFFF">Sanitize 3 Files</text>
+            </g>
+        </svg>
+    </div>
+
+    <!-- View 3: Active Sanitization (Added Stop Button) -->
+    <div class="design-container">
+        <div class="meta-header">
+            <span class="view-title">3. Processing State</span>
+            <span class="view-tag">US.1 System Feedback</span>
+        </div>
+        
+        <svg width="1000" height="600" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#FFFFFF"/>
+            
+            <g transform="translate(60, 60)">
+                <rect width="40" height="40" rx="8" fill="#EEF2FF"/>
+                <path d="M20 10 L20 30 M10 20 L30 20" stroke="#4F46E5" stroke-width="2" stroke-linecap="round"/>
+                <text x="56" y="28" font-family="sans-serif" font-size="24" font-weight="700" fill="#111827">Sanitizing Files...</text>
+                <text x="0" y="70" font-family="sans-serif" font-size="16" fill="#6B7280">Processing local data files. Please wait.</text>
+
+                <!-- ADDED: Stop Button -->
+                <g transform="translate(780, 0)">
+                    <rect width="100" height="32" rx="6" fill="#FFFFFF" stroke="#EF4444"/>
+                    <text x="50" y="21" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#EF4444">Stop Process</text>
+                </g>
+            </g>
+
+            <g transform="translate(60, 180)">
+                <rect width="880" height="180" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+                <rect x="24" y="24" width="80" height="28" rx="14" fill="#EEF2FF"/>
+                <text x="40" y="43" font-family="sans-serif" font-size="13" font-weight="600" fill="#4F46E5">Running</text>
+                
+                <circle cx="820" cy="38" r="4" fill="#10B981"/>
+                <text x="832" y="43" font-family="sans-serif" font-size="13" fill="#10B981">Live</text>
+                
+                <rect x="24" y="70" width="832" height="6" rx="3" fill="#F3F4F6"/>
+                <rect x="24" y="70" width="280" height="6" rx="3" fill="#4F46E5"/>
+                
+                <text x="24" y="120" font-family="sans-serif" font-size="18" fill="#111827">
+                    <tspan font-weight="600">1,247</tspan> records sanitized
+                </text>
+                <text x="830" y="120" font-family="sans-serif" font-size="16" fill="#6B7280" text-anchor="end">12s</text>
+            </g>
+
+            <!-- File Details -->
+            <g transform="translate(60, 380)">
+                <rect width="880" height="120" rx="12" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="1"/>
+                <text x="24" y="30" font-family="sans-serif" font-size="14" font-weight="600" fill="#111827">Currently Sanitizing</text>
+                <text x="24" y="70" font-family="sans-serif" font-size="13" fill="#6B7280">File:</text>
+                <text x="80" y="70" font-family="monospace" font-size="13" fill="#374151">app-logs-prod.jsonl (2 of 3)</text>
+                <text x="24" y="95" font-family="sans-serif" font-size="13" fill="#6B7280">Redacted:</text>
+                <text x="90" y="95" font-family="monospace" font-size="13" fill="#EF4444">142 PII instances found</text>
+            </g>
+        </svg>
+    </div>
+
+    <!-- View 4: Completion & CTA (Updated Layout/Copy) -->
+    <div class="design-container">
+        <div class="meta-header">
+            <span class="view-title">4. Completion & Cost Analysis CTA</span>
+            <span class="view-tag">US.10 Lead Capture</span>
+        </div>
+        
+        <svg width="1000" height="600" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#FFFFFF"/>
+            
+            <!-- Success Header -->
+            <g transform="translate(60, 60)">
+                <circle cx="20" cy="20" r="20" fill="#ECFDF5"/>
+                <path d="M12 20 L18 26 L28 14" stroke="#059669" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                
+                <text x="56" y="28" font-family="sans-serif" font-size="24" font-weight="700" fill="#111827">Sanitization Complete</text>
+                <text x="0" y="70" font-family="sans-serif" font-size="16" fill="#6B7280">3 files have been sanitized and saved locally.</text>
+            </g>
+
+            <!-- Split Card Container -->
+            <g transform="translate(60, 140)">
+                
+                <!-- Left: Local Files (Default) -->
+                <rect width="430" height="280" rx="12" fill="#FFFFFF" stroke="#E5E7EB"/>
+                <rect width="430" height="60" rx="12" fill="#F9FAFB"/> 
+                <rect y="30" width="430" height="30" fill="#F9FAFB"/> <!-- Corner fix -->
+                
+                <text x="24" y="38" font-family="sans-serif" font-size="14" font-weight="600" fill="#374151">Local Output</text>
+                
+                <text x="24" y="90" font-family="sans-serif" font-size="14" fill="#6B7280">Files saved to:</text>
+                <rect x="24" y="105" width="382" height="32" rx="4" fill="#F3F4F6"/>
+                <text x="34" y="125" font-family="monospace" font-size="12" fill="#374151">/Users/cfo/downloads/cecil-output/</text>
+                
+                <text x="24" y="160" font-family="sans-serif" font-size="14" fill="#6B7280">Summary:</text>
+                 <text x="24" y="180" font-family="sans-serif" font-size="14" fill="#111827">• 3 Files processed</text>
+                 <text x="24" y="200" font-family="sans-serif" font-size="14" fill="#111827">• 892 PII fields redacted</text>
+                
+                <rect x="24" y="220" width="140" height="36" rx="6" fill="#FFFFFF" stroke="#D1D5DB"/>
+                <text x="94" y="242" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#374151">Open Folder</text>
+
+                <!-- Right: Analyzer CTA (REDESIGNED) -->
+                <g transform="translate(450, 0)">
+                    <!-- Gradient Background -->
+                    <defs>
+                        <linearGradient id="ctaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#EEF2FF;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#E0E7FF;stop-opacity:1" />
+                        </linearGradient>
+                    </defs>
+                    <rect width="430" height="280" rx="12" fill="url(#ctaGradient)" stroke="#C7D2FE"/>
+                    
+                    <text x="24" y="38" font-family="sans-serif" font-size="12" font-weight="700" fill="#4F46E5" letter-spacing="1">RECOMMENDED</text>
+                    
+                    <!-- Updated Copy & Fixed Overflow -->
+                    <text x="24" y="80" font-family="sans-serif" font-size="20" font-weight="700" fill="#1E40AF">Unlock 20% AI Cost Savings</text>
+                    
+                    <text x="24" y="115" font-family="sans-serif" font-size="15" fill="#1E3A8A">Get a free report identifying model</text>
+                    <text x="24" y="135" font-family="sans-serif" font-size="15" fill="#1E3A8A">switching opportunities and usage hotspots.</text>
+                    
+                    <!-- Value List -->
+                    <g transform="translate(24, 160)">
+                         <text x="0" y="0" font-family="sans-serif" font-size="14" fill="#4338CA">✓ Detailed Spend Breakdown</text>
+                         <text x="0" y="24" font-family="sans-serif" font-size="14" fill="#4338CA">✓ Token Efficiency Analysis</text>
+                    </g>
+                    
+                    <rect x="24" y="215" width="382" height="40" rx="6" fill="#4F46E5"/>
+                    <text x="215" y="240" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="600" fill="#FFFFFF">Get Free Report</text>
+                    
+                    <text x="215" y="270" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#6366F1">Metadata only. No sensitive data leaves your device.</text>
+                </g>
+            </g>
+        </svg>
+    </div>
+
+</body>
+</html>

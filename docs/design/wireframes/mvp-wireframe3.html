@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cecil - Secure Data Sanitizer</title>
+    <style>
+        :root {
+            /* Light Theme Defaults */
+            --bg-body: #F3F4F6;
+            --bg-card: #FFFFFF;
+            --bg-nav: #FFFFFF;
+            --text-primary: #111827;
+            --text-secondary: #6B7280;
+            --border-color: #E5E7EB;
+            --primary-color: #4F46E5;
+            --primary-hover: #4338CA;
+            --primary-light: #EEF2FF;
+            --success-color: #10B981;
+            --success-bg: #ECFDF5;
+            --danger-color: #EF4444;
+            --danger-bg: #FEF2F2;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --cta-gradient-start: #EEF2FF;
+            --cta-gradient-end: #E0E7FF;
+        }
+
+        [data-theme="dark"] {
+            /* Dark Theme Overrides */
+            --bg-body: #0F172A;
+            --bg-card: #1E293B;
+            --bg-nav: #1E293B;
+            --text-primary: #F9FAFB;
+            --text-secondary: #94A3B8;
+            --border-color: #334155;
+            --primary-color: #6366F1;
+            --primary-hover: #818CF8;
+            --primary-light: #312E81;
+            --success-color: #34D399;
+            --success-bg: #064E3B;
+            --danger-color: #F87171;
+            --danger-bg: #450A0A;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+             --cta-gradient-start: #1E1B4B;
+            --cta-gradient-end: #312E81;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* --- Navigation --- */
+        nav {
+            background-color: var(--bg-nav);
+            border-bottom: 1px solid var(--border-color);
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            box-shadow: var(--shadow-sm);
+            z-index: 10;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--primary-color);
+            border-radius: 6px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+        }
+
+        .nav-link {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-link.active {
+            color: var(--text-primary);
+        }
+
+        .nav-link:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* --- Theme Toggle --- */
+        .theme-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .theme-toggle:hover {
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background-color: var(--primary-light);
+            color: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        /* --- Main Content --- */
+        main {
+            flex: 1;
+            padding: 32px;
+            overflow-y: auto;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* --- Views (State Management) --- */
+        .view {
+            display: none;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- Header Section --- */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .page-title h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .page-title p {
+            margin: 4px 0 0;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .btn-danger {
+            background-color: transparent;
+            border: 1px solid var(--danger-color);
+            color: var(--danger-color);
+        }
+        
+        .btn-danger:hover {
+            background-color: var(--danger-bg);
+        }
+
+        /* --- Dashboard Stats --- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-trend {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .trend-up {
+            background-color: var(--success-bg);
+            color: var(--success-color);
+        }
+
+        /* --- Table --- */
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .table-header {
+            padding: 16px 24px;
+            background-color: var(--bg-body);
+            border-bottom: 1px solid var(--border-color);
+            display: grid;
+            grid-template-columns: 2fr 2fr 2fr 1fr 1fr;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .table-row {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: grid;
+            grid-template-columns: 2fr 2fr 2fr 1fr 1fr;
+            align-items: center;
+            font-size: 14px;
+            transition: background-color 0.1s;
+        }
+        
+        .table-row:last-child {
+            border-bottom: none;
+        }
+
+        .table-row:hover {
+            background-color: var(--bg-body);
+        }
+
+        .status-pill {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-success { background-color: var(--success-bg); color: var(--success-color); }
+        .status-danger { background-color: var(--danger-bg); color: var(--danger-color); }
+
+        /* --- Wizard Styles --- */
+        .wizard-container {
+            max-width: 800px;
+            margin: 40px auto;
+        }
+
+        .wizard-step {
+            display: none;
+        }
+        
+        .wizard-step.active {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 60px;
+            text-align: center;
+            background-color: var(--bg-body);
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--primary-color);
+        }
+
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 24px 0;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background-color: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background-color: var(--bg-body);
+            border-radius: 4px;
+            margin: 24px 0 12px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .trust-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background-color: var(--success-bg);
+            color: var(--success-color);
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid var(--success-color);
+            opacity: 0.8;
+        }
+
+        /* --- CTA Card --- */
+        .cta-card {
+            background: linear-gradient(135deg, var(--cta-gradient-start) 0%, var(--cta-gradient-end) 100%);
+            border: 1px solid var(--primary-light);
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        .cta-title {
+            color: var(--primary-color);
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        
+        .cta-subtitle {
+            color: var(--text-primary);
+            opacity: 0.8;
+            margin-bottom: 24px;
+        }
+
+    </style>
+</head>
+<body data-theme="light">
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-left">
+            <div class="logo">
+                <div class="logo-icon"></div>
+                Cecil
+            </div>
+            <div class="nav-links">
+                <a class="nav-link active" onclick="switchView('dashboard')">Dashboard</a>
+                <a class="nav-link">Mapping Rules</a>
+                <a class="nav-link">Settings</a>
+            </div>
+        </div>
+        <div class="nav-right">
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
+                <!-- Sun Icon -->
+                <svg id="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <!-- Moon Icon -->
+                <svg id="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </button>
+            <div class="user-avatar">JS</div>
+        </div>
+    </nav>
+
+    <main>
+        <!-- VIEW 1: Dashboard -->
+        <div id="view-dashboard" class="view active">
+            <div class="page-header">
+                <div class="page-title">
+                    <h2>Audit Dashboard</h2>
+                    <p>Overview of recent sanitization jobs and PII detection.</p>
+                </div>
+                <button class="btn btn-primary" onclick="startNewJob()">
+                    <span style="font-size: 18px;">+</span> New Sanitization Job
+                </button>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Records Processed</div>
+                    <div class="stat-value">14,205</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">PII Redacted</div>
+                    <div class="stat-value">1,892 <span class="stat-trend trend-up">13.2%</span></div>
+                </div>
+                <div class="stat-card" style="border-color: var(--primary-color); background-color: var(--primary-light);">
+                    <div class="stat-label" style="color: var(--primary-color);">Est. Cost Savings</div>
+                    <div class="stat-value" style="color: var(--primary-color);">$4,200<span style="font-size: 16px;">/mo</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="table-header">
+                    <div>Job ID</div>
+                    <div>Source</div>
+                    <div>Date</div>
+                    <div>Status</div>
+                    <div>Action</div>
+                </div>
+                <div class="table-row">
+                    <div style="font-family: monospace;">local-job-003</div>
+                    <div>aws-prod-logs.jsonl</div>
+                    <div>Today, 10:42 AM</div>
+                    <div><span class="status-pill status-success">Completed</span></div>
+                    <div><button class="btn btn-secondary" style="padding: 4px 12px; font-size: 12px;">View Report</button></div>
+                </div>
+                <div class="table-row">
+                    <div style="font-family: monospace;">local-job-002</div>
+                    <div>user-db-dump.csv</div>
+                    <div>Yesterday, 4:15 PM</div>
+                    <div><span class="status-pill status-danger">PII Detected</span></div>
+                    <div><button class="btn btn-secondary" style="padding: 4px 12px; font-size: 12px;">Review</button></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: Ingestion Wizard -->
+        <div id="view-wizard" class="view">
+            
+            <!-- Step 1: Upload -->
+            <div id="step-1" class="wizard-step active">
+                <div class="page-header">
+                    <div class="page-title">
+                        <h2>File Ingestion</h2>
+                        <p>Select local files to sanitize. Data stays on your device.</p>
+                    </div>
+                    <div class="trust-badge">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        Data stays local
+                    </div>
+                </div>
+                
+                <div class="wizard-container">
+                    <div class="upload-zone" onclick="goToStep(2)">
+                        <div style="font-size: 48px; margin-bottom: 16px;">📄</div>
+                        <h3 style="margin: 0 0 8px 0; color: var(--text-primary);">Drag and drop log files</h3>
+                        <p style="margin: 0; color: var(--text-secondary);">Supported: JSONL, CSV, Parquet</p>
+                        <button class="btn btn-primary" style="margin-top: 24px;">Browse Files</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Review -->
+            <div id="step-2" class="wizard-step">
+                <div class="page-header">
+                    <div class="page-title">
+                        <h2>Queued Files</h2>
+                        <p>3 Files selected for sanitization.</p>
+                    </div>
+                    <div class="trust-badge">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        Data stays local
+                    </div>
+                </div>
+
+                <div class="wizard-container">
+                    <div class="file-list">
+                        <div class="file-item">
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <div style="font-size: 20px;">📄</div>
+                                <div>
+                                    <div style="font-weight: 600;">aws-billing-jan.csv</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary);">12.4 MB</div>
+                                </div>
+                            </div>
+                            <button style="background: none; border: none; color: var(--text-secondary); cursor: pointer;">✕</button>
+                        </div>
+                        <div class="file-item">
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <div style="font-size: 20px;">📄</div>
+                                <div>
+                                    <div style="font-weight: 600;">app-logs-prod.jsonl</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary);">45.1 MB</div>
+                                </div>
+                            </div>
+                            <button style="background: none; border: none; color: var(--text-secondary); cursor: pointer;">✕</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 24px;">
+                        <button class="btn btn-secondary" onclick="goToStep(1)">Cancel</button>
+                        <button class="btn btn-primary" onclick="startProcessing()">Sanitize 3 Files</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Processing -->
+            <div id="step-3" class="wizard-step">
+                <div class="page-header">
+                    <div class="page-title">
+                        <h2>Sanitizing Files...</h2>
+                        <p>Please wait while we scrub PII locally.</p>
+                    </div>
+                    <button class="btn btn-danger" onclick="goToStep(2)">Stop Process</button>
+                </div>
+
+                <div class="wizard-container">
+                    <div class="card" style="padding: 32px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span class="status-pill" style="background-color: var(--primary-light); color: var(--primary-color);">Running</span>
+                            <span style="font-family: monospace; color: var(--text-secondary);">00:12</span>
+                        </div>
+                        
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; font-size: 14px; margin-top: 8px;">
+                            <span id="record-count">0 records sanitized</span>
+                            <span style="color: var(--success-color);">Live</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 24px; padding: 16px; background-color: var(--bg-body); border-radius: 8px; font-family: monospace; font-size: 13px; color: var(--text-secondary);">
+                        > Processing app-logs-prod.jsonl...<br>
+                        > Found 'api_key' pattern at line 412... [REDACTED]<br>
+                        > Found 'email' pattern at line 890... [HASHED]
+                    </div>
+                </div>
+            </div>
+
+             <!-- Step 4: Completion -->
+             <div id="step-4" class="wizard-step">
+                <div class="page-header">
+                    <div class="page-title">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 32px; height: 32px; background: var(--success-bg); color: var(--success-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">✓</div>
+                            <h2>Sanitization Complete</h2>
+                        </div>
+                        <p style="margin-left: 44px;">3 files have been processed and saved locally.</p>
+                    </div>
+                    <button class="btn btn-secondary" onclick="switchView('dashboard')">Back to Dashboard</button>
+                </div>
+
+                <div class="wizard-container">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                        <!-- Local Output -->
+                        <div class="card" style="padding: 24px;">
+                            <h3 style="margin-top: 0;">Local Output</h3>
+                            <p style="font-size: 14px; color: var(--text-secondary);">Files saved to:</p>
+                            <div style="background: var(--bg-body); padding: 8px 12px; border-radius: 4px; font-family: monospace; font-size: 12px; margin-bottom: 16px;">
+                                /Users/admin/downloads/cecil-output/
+                            </div>
+                            <button class="btn btn-secondary" style="width: 100%; justify-content: center;">Open Folder</button>
+                        </div>
+
+                        <!-- Cost Analyzer CTA -->
+                        <div class="cta-card">
+                            <div style="font-size: 11px; font-weight: 700; color: var(--primary-color); letter-spacing: 1px; margin-bottom: 8px;">RECOMMENDED</div>
+                            <div class="cta-title">Unlock 20% Cost Savings</div>
+                            <div class="cta-subtitle">Get a free report identifying model switching opportunities.</div>
+                            
+                            <div style="text-align: left; margin-bottom: 20px; font-size: 14px; color: var(--primary-hover);">
+                                <div>✓ Detailed Spend Breakdown</div>
+                                <div>✓ Token Efficiency Analysis</div>
+                            </div>
+                            
+                            <button class="btn btn-primary" style="width: 100%; justify-content: center;">Get Free Report</button>
+                            <div style="font-size: 11px; margin-top: 12px; color: var(--primary-color); opacity: 0.8;">Metadata only. No sensitive data.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        // --- State Management ---
+        function switchView(viewId) {
+            // Hide all views
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+            // Show target view
+            document.getElementById('view-' + viewId).classList.add('active');
+            
+            // Update Nav State
+            document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+            if(viewId === 'dashboard') {
+                document.querySelector('.nav-link:first-child').classList.add('active');
+            }
+        }
+
+        function startNewJob() {
+            switchView('wizard');
+            goToStep(1);
+        }
+
+        // --- Wizard Logic ---
+        function goToStep(stepNum) {
+            document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
+            document.getElementById('step-' + stepNum).classList.add('active');
+        }
+
+        function startProcessing() {
+            goToStep(3);
+            let width = 0;
+            let count = 0;
+            const bar = document.getElementById('progress-fill');
+            const counter = document.getElementById('record-count');
+            
+            const interval = setInterval(() => {
+                if (width >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => goToStep(4), 500);
+                } else {
+                    width += 1; // Speed
+                    count += 35;
+                    bar.style.width = width + '%';
+                    counter.innerText = count.toLocaleString() + ' records sanitized';
+                }
+            }, 30);
+        }
+
+        // --- Theme Toggle ---
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const sunIcon = document.getElementById('sun-icon');
+            const moonIcon = document.getElementById('moon-icon');
+
+            if (currentTheme === 'light') {
+                body.setAttribute('data-theme', 'dark');
+                sunIcon.style.display = 'block';
+                moonIcon.style.display = 'none';
+            } else {
+                body.setAttribute('data-theme', 'light');
+                sunIcon.style.display = 'none';
+                moonIcon.style.display = 'block';
+            }
+        }
+    </script>
+
+</body>
+</html>
