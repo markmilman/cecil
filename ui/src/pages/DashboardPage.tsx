@@ -1,4 +1,5 @@
 import { StatsGrid } from '@/components/dashboard/StatsGrid';
+import { JobHistoryTable } from '@/components/dashboard/JobHistoryTable';
 
 interface DashboardPageProps {
   onStartWizard: () => void;
@@ -8,8 +9,7 @@ interface DashboardPageProps {
  * Dashboard page showing the audit overview.
  *
  * Displays a page header with title/subtitle and a "+ New Sanitization
- * Job" primary button, followed by the stats grid. The job history
- * table will be added in a subsequent sub-issue.
+ * Job" primary button, followed by the stats grid and job history table.
  */
 export function DashboardPage({ onStartWizard }: DashboardPageProps) {
   return (
@@ -53,7 +53,7 @@ export function DashboardPage({ onStartWizard }: DashboardPageProps) {
 
       <StatsGrid />
 
-      {/* Job history table will be added by sub-issue #106 */}
+      <JobHistoryTable />
     </div>
   );
 }
