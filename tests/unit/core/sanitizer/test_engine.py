@@ -582,3 +582,66 @@ class TestFullPipelineRoundTrip:
         assert engine.records_processed == 3
         assert engine.records_sanitized == 3
         assert engine.records_failed == 0
+
+        # PII leak assertions for all records
+        all_output = str([r.data for r in results])
+        assert "alice@example.com" not in all_output
+        assert "bob@example.com" not in all_output
+        assert "Bob" not in all_output
+
+
+# -- Additional PII leak tests for engine pipeline ---------------------------
+
+
+class TestEnginePIILeakComprehensive:
+    """Comprehensive PII leak detection across the engine pipeline."""
+
+    def test_multiple_pii_fields_none_leak(
+        self,
+        engine: SanitizationEngine,
+    ) -> None:
+        """A record with PII in every field must leak none of it."""
+        pii_record = {
+            "email": "jane.doe@example.com",
+            "name": "Jane Doe",
+            "user_id": "uid-secret-999",
+        }
+        records = _make_records([pii_record])
+        result = next(engine.process_stream(records))
+        output_str = str(result.data)
+        assert "jane.doe@example.com" not in output_str
+        assert "Jane Doe" not in output_str
+        assert "uid-secret-999" not in output_str
+
+    def test_unmapped_fields_pii_is_redacted_not_leaked(
+        self,
+        engine: SanitizationEngine,
+    ) -> None:
+        """Unmapped fields default to REDACT and must not leak PII."""
+        records = _make_records(
+            [{"credit_card": "4111-1111-1111-1111", "ssn": "123-45-6789"}],
+        )
+        result = next(engine.process_stream(records))
+        output_str = str(result.data)
+        assert "4111-1111-1111-1111" not in output_str
+        assert "123-45-6789" not in output_str
+
+    def test_non_string_pii_value_is_redacted(
+        self,
+        engine: SanitizationEngine,
+    ) -> None:
+        """Non-string values (e.g., int) are converted to str and redacted."""
+        records = _make_records([{"email": 987654321}])
+        result = next(engine.process_stream(records))
+        assert "987654321" not in str(result.data)
+
+    def test_audit_does_not_contain_pii(
+        self,
+        engine: SanitizationEngine,
+    ) -> None:
+        """The audit trail must not contain any PII values."""
+        pii = "top-secret-data-xyz"
+        records = _make_records([{"email": pii}])
+        result = next(engine.process_stream(records))
+        audit_str = str(result.audit)
+        assert pii not in audit_str

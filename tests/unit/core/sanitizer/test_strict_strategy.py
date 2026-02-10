@@ -802,3 +802,51 @@ class TestStrictStrategyWithMappingConfig:
         result = s.redact(value, detections)
         assert result == "[ANY_FIELD_REDACTED]"
         assert "some-data" not in result
+
+
+# -- MappingConfig redact path for unmapped field with options ----------------
+
+
+class TestStrictStrategyConfigUnmappedFieldRedact:
+    """When MappingConfig is used and field is unmapped, options is empty."""
+
+    def test_config_unmapped_field_redact_delegates_to_apply_action(self) -> None:
+        """Unmapped field with MappingConfig uses apply_action with empty options."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={"email": FieldMappingEntry(action=RedactionAction.KEEP)},
+        )
+        s = StrictStrategy(config=config)
+        pii = "sensitive-unmapped-data"
+        detections = s.scan_value("unknown", pii)
+        result = s.redact(pii, detections)
+        assert result == "[UNKNOWN_REDACTED]"
+        assert pii not in result
+
+    def test_config_unmapped_field_hash_via_default(self) -> None:
+        """When default_action is HASH, unmapped fields get hashed."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.HASH,
+            fields={"email": FieldMappingEntry(action=RedactionAction.KEEP)},
+        )
+        s = StrictStrategy(config=config)
+        pii = "unmapped-secret-value"
+        detections = s.scan_value("unknown", pii)
+        result = s.redact(pii, detections)
+        assert result.startswith("hash_")
+        assert pii not in result
+
+    def test_config_unmapped_field_mask_via_default(self) -> None:
+        """When default_action is MASK, unmapped fields get masked."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.MASK,
+            fields={"email": FieldMappingEntry(action=RedactionAction.KEEP)},
+        )
+        s = StrictStrategy(config=config)
+        pii = "sensitive-long-value"
+        detections = s.scan_value("unknown", pii)
+        result = s.redact(pii, detections)
+        assert pii not in result

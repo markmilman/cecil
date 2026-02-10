@@ -448,3 +448,95 @@ class TestValidateMappingAgainstRecord:
         result = validate_mapping_against_record(config, record)
 
         assert result.missing_fields == ["apple", "mango", "zebra"]
+
+
+# -- MappingConfig policy_hash edge cases -------------------------------------
+
+
+class TestMappingConfigPolicyHashEdgeCases:
+    """Additional edge-case tests for policy_hash determinism."""
+
+    def test_policy_hash_with_options_differs_from_without(self) -> None:
+        """Two configs differing only in options produce different hashes."""
+        config_a = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={
+                "email": FieldMappingEntry(
+                    action=RedactionAction.MASK,
+                    options={"preserve_domain": True},
+                ),
+            },
+        )
+        config_b = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={
+                "email": FieldMappingEntry(
+                    action=RedactionAction.MASK,
+                    options={},
+                ),
+            },
+        )
+        assert config_a.policy_hash() != config_b.policy_hash()
+
+    def test_policy_hash_with_different_default_action_differs(self) -> None:
+        """Two configs with different default_action produce different hashes."""
+        config_a = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={"f": FieldMappingEntry(action=RedactionAction.KEEP)},
+        )
+        config_b = MappingConfig(
+            version=1,
+            default_action=RedactionAction.KEEP,
+            fields={"f": FieldMappingEntry(action=RedactionAction.KEEP)},
+        )
+        assert config_a.policy_hash() != config_b.policy_hash()
+
+    def test_policy_hash_field_order_independent(self) -> None:
+        """Fields are sorted before hashing so order does not matter."""
+        config_a = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={
+                "a": FieldMappingEntry(action=RedactionAction.REDACT),
+                "b": FieldMappingEntry(action=RedactionAction.MASK),
+            },
+        )
+        # Same fields but inserted in reverse order
+        from collections import OrderedDict
+
+        fields_reversed = OrderedDict(
+            [
+                ("b", FieldMappingEntry(action=RedactionAction.MASK)),
+                ("a", FieldMappingEntry(action=RedactionAction.REDACT)),
+            ],
+        )
+        config_b = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields=dict(fields_reversed),
+        )
+        assert config_a.policy_hash() == config_b.policy_hash()
+
+
+# -- MappingParser action whitespace/case edge cases --------------------------
+
+
+class TestMappingParserActionEdgeCases:
+    """Edge-case tests for action parsing."""
+
+    def test_parse_action_with_leading_trailing_whitespace(self) -> None:
+        """Action values with whitespace are trimmed and normalized."""
+        parser = MappingParser()
+        data = _valid_data(fields={"email": {"action": "  REDACT  "}})
+        config = parser.parse_dict(data)
+        assert config.fields["email"].action == RedactionAction.REDACT
+
+    def test_parse_action_mixed_case(self) -> None:
+        """Mixed-case action values are normalized."""
+        parser = MappingParser()
+        data = _valid_data(fields={"email": {"action": "ReDaCt"}})
+        config = parser.parse_dict(data)
+        assert config.fields["email"].action == RedactionAction.REDACT

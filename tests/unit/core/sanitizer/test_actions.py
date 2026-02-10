@@ -178,3 +178,78 @@ class TestApplyAction:
             field_name="email",
         )
         assert result == "j***@example.com"
+
+
+# -- PII leak assertions for all action tests --------------------------------
+
+
+class TestActionsPIILeakDetection:
+    """Every action that transforms PII must not leak the original value."""
+
+    def test_apply_redact_pii_absent_from_result(self) -> None:
+        """apply_redact must not leak the original email."""
+        pii = "john@example.com"
+        result = apply_redact(pii, "user_email")
+        assert pii not in result
+        assert "john" not in result
+
+    def test_apply_mask_email_pii_absent_from_result(self) -> None:
+        """apply_mask for email must not leak the full local part."""
+        pii = "john.doe@example.com"
+        result = apply_mask(pii)
+        assert "john.doe" not in result
+
+    def test_apply_mask_string_pii_absent_from_result(self) -> None:
+        """apply_mask for a long string must not leak the full original."""
+        pii = "password123"
+        result = apply_mask(pii)
+        assert pii not in result
+
+    def test_apply_hash_pii_absent_from_result(self) -> None:
+        """apply_hash must not leak the original value."""
+        pii = "123-45-6789"
+        result = apply_hash(pii)
+        assert pii not in result
+        assert "123-45" not in result
+
+    def test_apply_action_redact_pii_absent(self) -> None:
+        """apply_action REDACT must not leak PII."""
+        pii = "alice@corp.com"
+        result = apply_action(pii, RedactionAction.REDACT, field_name="email")
+        assert pii not in result
+        assert "alice" not in result
+
+    def test_apply_action_mask_pii_absent(self) -> None:
+        """apply_action MASK must not leak PII."""
+        pii = "bob.smith@corp.com"
+        result = apply_action(pii, RedactionAction.MASK, field_name="email")
+        assert "bob.smith" not in result
+
+    def test_apply_action_hash_pii_absent(self) -> None:
+        """apply_action HASH must not leak PII."""
+        pii = "sk-secret-key-12345"
+        result = apply_action(pii, RedactionAction.HASH, field_name="api_key")
+        assert pii not in result
+        assert "secret" not in result
+
+    def test_apply_action_mask_with_preserve_domain_pii_absent(self) -> None:
+        """apply_action MASK with preserve_domain must not leak local part."""
+        pii = "sensitive.user@example.com"
+        result = apply_action(
+            pii,
+            RedactionAction.MASK,
+            field_name="email",
+            options={"preserve_domain": True},
+        )
+        assert "sensitive.user" not in result
+
+    def test_apply_mask_email_with_empty_local_part(self) -> None:
+        """apply_mask handles edge case of @ at beginning."""
+        result = apply_mask("@example.com")
+        assert result == "***@example.com"
+
+    def test_apply_mask_email_with_multiple_at_signs(self) -> None:
+        """apply_mask splits on first @ only."""
+        result = apply_mask("user@host@domain.com")
+        assert result == "u***@host@domain.com"
+        assert "user" not in result

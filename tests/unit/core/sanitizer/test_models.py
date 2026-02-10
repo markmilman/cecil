@@ -692,3 +692,55 @@ class TestMappingErrors:
         """MappingFileError can be caught with except CecilError."""
         with pytest.raises(CecilError):
             raise MappingFileError("cannot read file")
+
+
+# -- MappingConfig policy_hash with multiple fields ----------------------------
+
+
+class TestMappingConfigPolicyHashMultiField:
+    """Verify policy_hash covers multiple fields and options."""
+
+    def test_policy_hash_includes_options_in_digest(self) -> None:
+        """Options are part of the hash payload so they affect the digest."""
+        config_with_opts = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={
+                "email": FieldMappingEntry(
+                    action=RedactionAction.MASK,
+                    options={"preserve_domain": True},
+                ),
+            },
+        )
+        config_without_opts = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={
+                "email": FieldMappingEntry(
+                    action=RedactionAction.MASK,
+                    options={},
+                ),
+            },
+        )
+        assert config_with_opts.policy_hash() != config_without_opts.policy_hash()
+
+    def test_policy_hash_empty_fields_is_valid(self) -> None:
+        """policy_hash on a config with no fields produces a valid hex digest."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.KEEP,
+            fields={},
+        )
+        h = config.policy_hash()
+        assert len(h) == 64
+        int(h, 16)  # Must be valid hex
+
+    def test_mapping_validation_result_frozen_raises_on_assignment(self) -> None:
+        """MappingValidationResult is frozen and cannot be mutated."""
+        result = MappingValidationResult(
+            matched_fields=["a"],
+            unmapped_fields=["b"],
+            missing_fields=["c"],
+        )
+        with pytest.raises(AttributeError):
+            result.matched_fields = []  # type: ignore[misc]
