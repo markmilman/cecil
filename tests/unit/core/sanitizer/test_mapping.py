@@ -1,0 +1,317 @@
+"""Tests for MappingParser -- mapping.yaml loading and validation."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from cecil.core.sanitizer.mapping import MappingParser
+from cecil.core.sanitizer.models import (
+    MappingConfig,
+    RedactionAction,
+)
+from cecil.utils.errors import MappingFileError, MappingValidationError
+
+
+@pytest.fixture()
+def parser() -> MappingParser:
+    """Return a fresh MappingParser instance."""
+    return MappingParser()
+
+
+def _valid_data(
+    *,
+    version: int = 1,
+    default_action: str | None = None,
+    fields: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return a minimal valid mapping dict, with optional overrides."""
+    data: dict[str, Any] = {
+        "version": version,
+        "fields": fields or {"email": {"action": "redact"}},
+    }
+    if default_action is not None:
+        data["default_action"] = default_action
+    return data
+
+
+def _write_yaml(tmp_path: Path, content: str, name: str = "mapping.yaml") -> Path:
+    """Write YAML content to a temp file and return its path."""
+    p = tmp_path / name
+    p.write_text(content, encoding="utf-8")
+    return p
+
+
+# -- File-based tests ------------------------------------------------------
+
+
+class TestParseFile:
+    """Tests for MappingParser.parse_file()."""
+
+    def test_parse_file_valid_yaml_returns_mapping_config(
+        self,
+        parser: MappingParser,
+        tmp_path: Path,
+    ) -> None:
+        """A well-formed mapping.yaml is parsed into a MappingConfig."""
+        yaml_content = """\
+version: 1
+default_action: keep
+fields:
+  email:
+    action: redact
+  name:
+    action: mask
+    preserve_length: true
+"""
+        path = _write_yaml(tmp_path, yaml_content)
+        config = parser.parse_file(path)
+
+        assert isinstance(config, MappingConfig)
+        assert config.version == 1
+        assert config.default_action == RedactionAction.KEEP
+        assert len(config.fields) == 2
+        assert config.fields["email"].action == RedactionAction.REDACT
+        assert config.fields["name"].action == RedactionAction.MASK
+        assert config.fields["name"].options == {"preserve_length": True}
+
+    def test_parse_file_not_found_raises_mapping_file_error(
+        self,
+        parser: MappingParser,
+        tmp_path: Path,
+    ) -> None:
+        """A non-existent file raises MappingFileError."""
+        missing = tmp_path / "nonexistent.yaml"
+        with pytest.raises(MappingFileError, match="not found"):
+            parser.parse_file(missing)
+
+    def test_parse_file_os_error_raises_mapping_file_error(
+        self,
+        parser: MappingParser,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """An OS-level read error (e.g., permission denied) raises MappingFileError."""
+        path = _write_yaml(tmp_path, "version: 1\nfields:\n  a:\n    action: redact\n")
+
+        def _raise_oserror(*_args: Any, **_kwargs: Any) -> str:
+            raise OSError("Permission denied")
+
+        monkeypatch.setattr(Path, "read_text", _raise_oserror)
+        with pytest.raises(MappingFileError, match="Cannot read"):
+            parser.parse_file(path)
+
+    def test_parse_file_invalid_yaml_syntax_raises_mapping_file_error(
+        self,
+        parser: MappingParser,
+        tmp_path: Path,
+    ) -> None:
+        """Malformed YAML raises MappingFileError."""
+        path = _write_yaml(tmp_path, ":\n  - :\n  bad: [unterminated")
+        with pytest.raises(MappingFileError, match="Invalid YAML"):
+            parser.parse_file(path)
+
+    def test_parse_file_non_dict_yaml_raises_validation_error(
+        self,
+        parser: MappingParser,
+        tmp_path: Path,
+    ) -> None:
+        """A YAML file containing a list (not dict) raises MappingValidationError."""
+        path = _write_yaml(tmp_path, "- item1\n- item2\n")
+        with pytest.raises(MappingValidationError, match="YAML mapping"):
+            parser.parse_file(path)
+
+
+# -- Dict-based tests ------------------------------------------------------
+
+
+class TestParseDict:
+    """Tests for MappingParser.parse_dict()."""
+
+    def test_parse_dict_valid_returns_mapping_config(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """A valid dict is correctly converted to MappingConfig."""
+        data = _valid_data(default_action="keep")
+        config = parser.parse_dict(data)
+
+        assert config.version == 1
+        assert config.default_action == RedactionAction.KEEP
+        assert "email" in config.fields
+        assert config.fields["email"].action == RedactionAction.REDACT
+
+    def test_parse_dict_missing_version_raises_validation_error(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """Missing 'version' key raises MappingValidationError."""
+        data = {"fields": {"email": {"action": "redact"}}}
+        with pytest.raises(MappingValidationError, match="version"):
+            parser.parse_dict(data)
+
+    def test_parse_dict_unsupported_version_raises_validation_error(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """An unsupported version number raises MappingValidationError."""
+        data = _valid_data(version=99)
+        with pytest.raises(MappingValidationError, match="Unsupported"):
+            parser.parse_dict(data)
+
+    def test_parse_dict_missing_fields_raises_validation_error(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """Missing 'fields' key raises MappingValidationError."""
+        data: dict[str, Any] = {"version": 1}
+        with pytest.raises(MappingValidationError, match="fields"):
+            parser.parse_dict(data)
+
+    def test_parse_dict_empty_fields_raises_validation_error(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """An empty 'fields' dict raises MappingValidationError."""
+        data: dict[str, Any] = {"version": 1, "fields": {}}
+        with pytest.raises(MappingValidationError, match="at least one"):
+            parser.parse_dict(data)
+
+    def test_parse_dict_fields_not_dict_raises_validation_error(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """'fields' as a list (not dict) raises MappingValidationError."""
+        data: dict[str, Any] = {"version": 1, "fields": ["email"]}
+        with pytest.raises(MappingValidationError, match=r"mapping.*dict"):
+            parser.parse_dict(data)
+
+    def test_parse_dict_invalid_action_raises_validation_error(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """An unrecognised action value raises MappingValidationError."""
+        data = _valid_data(fields={"email": {"action": "nuke"}})
+        with pytest.raises(MappingValidationError, match="Invalid action"):
+            parser.parse_dict(data)
+
+    def test_parse_dict_default_action_defaults_to_redact(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """Omitting default_action results in REDACT."""
+        data = _valid_data()  # no default_action
+        config = parser.parse_dict(data)
+        assert config.default_action == RedactionAction.REDACT
+
+    def test_parse_dict_explicit_default_action_preserved(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """An explicit default_action is respected."""
+        data = _valid_data(default_action="hash")
+        config = parser.parse_dict(data)
+        assert config.default_action == RedactionAction.HASH
+
+    def test_parse_dict_invalid_default_action_raises_validation_error(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """An invalid default_action raises MappingValidationError."""
+        data = _valid_data(default_action="destroy")
+        with pytest.raises(MappingValidationError, match="Invalid action"):
+            parser.parse_dict(data)
+
+    def test_parse_dict_action_case_insensitive(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """Action values are case-insensitive."""
+        data = _valid_data(
+            fields={
+                "a": {"action": "REDACT"},
+                "b": {"action": "Mask"},
+                "c": {"action": "HASH"},
+                "d": {"action": "Keep"},
+            },
+        )
+        config = parser.parse_dict(data)
+        assert config.fields["a"].action == RedactionAction.REDACT
+        assert config.fields["b"].action == RedactionAction.MASK
+        assert config.fields["c"].action == RedactionAction.HASH
+        assert config.fields["d"].action == RedactionAction.KEEP
+
+    def test_parse_dict_action_specific_options_preserved(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """Extra keys beside 'action' are captured in options."""
+        data = _valid_data(
+            fields={
+                "email": {
+                    "action": "mask",
+                    "preserve_domain": True,
+                    "mask_char": "*",
+                },
+            },
+        )
+        config = parser.parse_dict(data)
+        entry = config.fields["email"]
+        assert entry.action == RedactionAction.MASK
+        assert entry.options == {"preserve_domain": True, "mask_char": "*"}
+
+    def test_parse_dict_not_dict_raises_validation_error(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """Passing a non-dict to parse_dict raises MappingValidationError."""
+        with pytest.raises(MappingValidationError, match="must be a dict"):
+            parser.parse_dict("not a dict")  # type: ignore[arg-type]
+
+    def test_parse_dict_all_four_actions_accepted(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """All four RedactionAction values are accepted as field actions."""
+        data = _valid_data(
+            fields={
+                "f1": {"action": "redact"},
+                "f2": {"action": "mask"},
+                "f3": {"action": "hash"},
+                "f4": {"action": "keep"},
+            },
+        )
+        config = parser.parse_dict(data)
+        assert config.fields["f1"].action == RedactionAction.REDACT
+        assert config.fields["f2"].action == RedactionAction.MASK
+        assert config.fields["f3"].action == RedactionAction.HASH
+        assert config.fields["f4"].action == RedactionAction.KEEP
+
+    def test_parse_dict_field_config_not_dict_raises_validation_error(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """A field whose config is not a dict raises MappingValidationError."""
+        data = _valid_data(fields={"email": "redact"})
+        with pytest.raises(MappingValidationError, match="must be a dict"):
+            parser.parse_dict(data)
+
+    def test_parse_dict_field_missing_action_raises_validation_error(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """A field config without 'action' key raises MappingValidationError."""
+        data = _valid_data(fields={"email": {"preserve_domain": True}})
+        with pytest.raises(MappingValidationError, match="missing required key 'action'"):
+            parser.parse_dict(data)
+
+    def test_parse_dict_action_not_string_raises_validation_error(
+        self,
+        parser: MappingParser,
+    ) -> None:
+        """A non-string action value (e.g., int) raises MappingValidationError."""
+        data = _valid_data(fields={"email": {"action": 42}})
+        with pytest.raises(MappingValidationError, match="expected a string"):
+            parser.parse_dict(data)

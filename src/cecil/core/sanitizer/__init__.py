@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from cecil.core.sanitizer.engine import SanitizationEngine
+from cecil.core.sanitizer.mapping import MappingParser
 from cecil.core.sanitizer.models import (
     Detection,
     FieldMapping,
@@ -29,6 +30,7 @@ __all__ = [
     "FieldMappingEntry",
     "FieldRedaction",
     "MappingConfig",
+    "MappingParser",
     "MappingValidationResult",
     "RedactionAction",
     "RedactionAudit",
