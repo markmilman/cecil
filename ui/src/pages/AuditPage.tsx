@@ -27,8 +27,6 @@ export function AuditPage() {
           icon={<FileSearchIcon />}
           title="No Audit Results Yet"
           description="Complete a scan to view sanitization results. The audit view shows which fields were redacted and provides previews of the sanitized output."
-          actionLabel="Start a Scan"
-          actionHref="/ingest"
         />
       </div>
     </div>

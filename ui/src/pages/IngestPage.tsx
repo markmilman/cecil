@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { UploadIcon, CheckCircleIcon, AlertCircleIcon, RefreshCwIcon, ArrowRightIcon, InfoIcon, XIcon } from 'lucide-react';
 import { WelcomeModal } from '@/components/common/WelcomeModal';
 import { FilePickerCard } from '@/components/ingestion/FilePickerCard';
@@ -21,7 +20,6 @@ import { ScanStatus } from '@/types';
  * Includes success/error flows and navigation guards (#62).
  */
 export function IngestPage() {
-  const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [fileFormat, setFileFormat] = useState<FileFormat | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -208,7 +206,7 @@ export function IngestPage() {
               <div className="flex items-center justify-center gap-4">
                 <button
                   type="button"
-                  onClick={() => navigate('/audit')}
+                  onClick={handleNewScan}
                   className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors duration-150"
                 >
                   View Audit Results

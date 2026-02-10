@@ -1,0 +1,102 @@
+import { CheckIcon } from 'lucide-react';
+import { LocalOutputCard } from './LocalOutputCard';
+import { CostAnalysisCTA } from './CostAnalysisCTA';
+
+interface CompletionViewProps {
+  fileCount: number;
+  outputPath: string;
+  onBackToDashboard: () => void;
+  onOpenFolder?: () => void;
+  onGetReport?: () => void;
+}
+
+/**
+ * Wizard Step 4: Completion view.
+ *
+ * Shows a success header with green checkmark circle, "Sanitization
+ * Complete" heading, subtitle with file count, and "Back to Dashboard"
+ * button. Below is a 2-column grid with LocalOutputCard (left) and
+ * CostAnalysisCTA (right).
+ */
+export function CompletionView({
+  fileCount,
+  outputPath,
+  onBackToDashboard,
+  onOpenFolder,
+  onGetReport,
+}: CompletionViewProps) {
+  return (
+    <div>
+      {/* Success Header */}
+      <div
+        className="flex items-center justify-between"
+        style={{ marginBottom: '24px' }}
+      >
+        <div>
+          <div className="flex items-center gap-3">
+            <div
+              className="flex items-center justify-center rounded-full"
+              style={{
+                width: '32px',
+                height: '32px',
+                backgroundColor: 'var(--success-bg)',
+                color: 'var(--success-color)',
+              }}
+            >
+              <CheckIcon className="h-5 w-5" strokeWidth={3} />
+            </div>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: '24px',
+                color: 'var(--text-primary)',
+              }}
+            >
+              Sanitization Complete
+            </h2>
+          </div>
+          <p
+            style={{
+              margin: '4px 0 0 44px',
+              color: 'var(--text-secondary)',
+              fontSize: '14px',
+            }}
+          >
+            {fileCount} {fileCount === 1 ? 'file has' : 'files have'} been processed and saved locally.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={onBackToDashboard}
+        >
+          Back to Dashboard
+        </button>
+      </div>
+
+      {/* 2-column grid: Local Output + CTA */}
+      <div
+        style={{
+          maxWidth: '800px',
+          margin: '40px auto 0',
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '24px',
+          }}
+        >
+          <LocalOutputCard
+            outputPath={outputPath}
+            onOpenFolder={onOpenFolder}
+          />
+          <CostAnalysisCTA
+            onGetReport={onGetReport}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

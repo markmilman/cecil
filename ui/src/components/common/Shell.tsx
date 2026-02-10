@@ -1,112 +1,159 @@
 import { type ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { UploadIcon, MapIcon, FileSearchIcon } from 'lucide-react';
+import { MoonIcon, SunIcon } from 'lucide-react';
+import { useThemeContext } from '@/hooks/useTheme';
 
 /**
  * Props for the Shell component
  */
 interface ShellProps {
   children: ReactNode;
+  activeView: string;
+  onNavigate: (view: string) => void;
 }
 
 /**
- * Navigation item definition
+ * Navigation link definition
  */
-interface NavItem {
-  path: string;
+interface NavLinkItem {
+  view: string;
   label: string;
-  icon: ReactNode;
 }
 
+const NAV_LINKS: NavLinkItem[] = [
+  { view: 'dashboard', label: 'Dashboard' },
+  { view: 'mapping', label: 'Mapping Rules' },
+  { view: 'settings', label: 'Settings' },
+];
+
 /**
- * Shell layout component (v2)
+ * Shell layout component with top navigation bar
  *
- * Provides the main layout structure with navigation sidebar and content area.
- * V2 improvements: shadow-lg sidebar, left border accent on active nav items,
- * improved spacing, and ARIA navigation landmark.
+ * Provides the main layout structure with a fixed 64px top nav bar
+ * containing logo, navigation links, theme toggle, and user avatar.
+ * Navigation is state-driven via props rather than React Router.
  */
-export function Shell({ children }: ShellProps) {
-  const location = useLocation();
-
-  const navItems: NavItem[] = [
-    {
-      path: '/ingest',
-      label: 'Ingest',
-      icon: <UploadIcon className="h-5 w-5" />,
-    },
-    {
-      path: '/mapping',
-      label: 'Mapping',
-      icon: <MapIcon className="h-5 w-5" />,
-    },
-    {
-      path: '/audit',
-      label: 'Audit',
-      icon: <FileSearchIcon className="h-5 w-5" />,
-    },
-  ];
-
-  const isActiveRoute = (path: string): boolean => {
-    return location.pathname === path;
-  };
+export function Shell({ children, activeView, onNavigate }: ShellProps) {
+  const { theme, toggleTheme } = useThemeContext();
 
   return (
-    <div className="flex h-full bg-slate-50">
+    <div
+      className="flex h-full flex-col"
+      style={{ backgroundColor: 'var(--bg-body)' }}
+    >
       {/* Skip Navigation Link */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-indigo-600 focus:shadow-lg focus:rounded"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-lg"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          color: 'var(--primary-color)',
+        }}
       >
         Skip to main content
       </a>
 
-      {/* Sidebar Navigation */}
-      <aside className="w-64 bg-white border-r border-slate-200 shadow-lg">
-        <div className="flex flex-col h-full">
-          {/* Logo/Header */}
-          <div className="p-6 border-b border-slate-200">
-            <h1 className="text-2xl font-extrabold text-primary">Cecil</h1>
-            <p className="text-sm text-slate-600 mt-1">Data Sanitizer & Cost Optimizer</p>
+      {/* Top Navigation Bar */}
+      <nav
+        aria-label="Main navigation"
+        className="flex h-16 shrink-0 items-center justify-between px-6"
+        style={{
+          backgroundColor: 'var(--bg-nav)',
+          borderBottom: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-sm)',
+          zIndex: 10,
+          transition: 'background-color 0.3s, border-color 0.3s',
+        }}
+      >
+        {/* Left: Logo + Nav Links */}
+        <div className="flex items-center gap-8">
+          {/* Logo */}
+          <div
+            className="flex items-center gap-2 text-xl font-bold"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <div
+              className="h-6 w-6 rounded-md"
+              style={{ backgroundColor: 'var(--primary-color)' }}
+              aria-hidden="true"
+            />
+            Cecil
           </div>
 
-          {/* Navigation Links */}
-          <nav className="flex-1 p-4" aria-label="Main navigation">
-            <ul className="space-y-1">
-              {navItems.map((item) => {
-                const isActive = isActiveRoute(item.path);
-                return (
-                  <li key={item.path}>
-                    <Link
-                      to={item.path}
-                      className={`
-                        flex items-center gap-3 px-4 py-3.5 rounded-lg
-                        transition-all duration-200
-                        focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
-                        ${
-                          isActive
-                            ? 'bg-indigo-50 text-accent border-l-4 border-accent font-semibold'
-                            : 'text-primary hover:bg-slate-50 border-l-4 border-transparent'
-                        }
-                      `}
-                      aria-current={isActive ? 'page' : undefined}
-                    >
-                      {item.icon}
-                      <span className="font-medium">{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-
-          {/* Footer */}
-          <div className="p-4 border-t border-slate-200">
-            <p className="text-xs text-slate-600 text-center">
-              Local-First, Cloud-Optional
-            </p>
+          {/* Nav Links */}
+          <div className="flex items-center gap-6" role="list">
+            {NAV_LINKS.map((link) => {
+              const isActive = activeView === link.view;
+              return (
+                <button
+                  key={link.view}
+                  type="button"
+                  role="listitem"
+                  onClick={() => onNavigate(link.view)}
+                  className="cursor-pointer border-none bg-transparent text-sm font-medium transition-colors duration-200"
+                  style={{
+                    color: isActive
+                      ? 'var(--text-primary)'
+                      : 'var(--text-secondary)',
+                    padding: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = 'var(--primary-color)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = isActive
+                      ? 'var(--text-primary)'
+                      : 'var(--text-secondary)';
+                  }}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  {link.label}
+                </button>
+              );
+            })}
           </div>
         </div>
-      </aside>
+
+        {/* Right: Theme Toggle + User Avatar */}
+        <div className="flex items-center gap-4">
+          {/* Theme Toggle */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex cursor-pointer items-center justify-center rounded-full border-none bg-transparent p-2 transition-colors duration-200"
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--bg-body)';
+              e.currentTarget.style.color = 'var(--text-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--text-secondary)';
+            }}
+            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+            title="Toggle Theme"
+          >
+            {theme === 'light' ? (
+              <MoonIcon className="h-5 w-5" />
+            ) : (
+              <SunIcon className="h-5 w-5" />
+            )}
+          </button>
+
+          {/* User Avatar */}
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
+            style={{
+              backgroundColor: 'var(--primary-light)',
+              color: 'var(--primary-color)',
+            }}
+            aria-label="User avatar"
+          >
+            JS
+          </div>
+        </div>
+      </nav>
 
       {/* Main Content Area */}
       <main id="main-content" className="flex-1 overflow-auto">
