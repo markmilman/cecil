@@ -1,7 +1,7 @@
 ---
 name: software-architect
 description: Designs system architecture, evaluates technical trade-offs, and defines interfaces. Use for architectural decisions and design reviews.
-tools: Read, Glob, Grep
+tools: Read, Edit, Write, Bash, Glob, Grep
 model: opus
 ---
 

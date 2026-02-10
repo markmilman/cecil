@@ -1,7 +1,7 @@
 ---
 name: tech-lead
 description: Orchestrates engineering work — decomposes user stories into atomic tasks, manages dependencies, and assigns work to sub-agents. Use for sprint planning and task coordination.
-tools: Read, Glob, Grep
+tools: Read, Edit, Write, Bash, Glob, Grep
 model: opus
 ---
 

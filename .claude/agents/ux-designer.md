@@ -1,7 +1,7 @@
 ---
 name: ux-designer
 description: Designs user experience — wireframes, interaction flows, design tokens, and accessibility standards. Use for UI/UX planning and design review.
-tools: Read, Glob, Grep
+tools: Read, Bash, Glob, Grep
 model: sonnet
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: product-manager
 description: Generates user stories, acceptance criteria, and product requirements. Use for feature planning and prioritization.
-tools: Read, Glob, Grep
+tools: Read, Bash, Glob, Grep
 model: sonnet
 ---
 

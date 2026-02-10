@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cecil SOE Experience Design</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+    <div id="app" class="flex min-h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 border-r border-slate-900 bg-slate-950 p-6 flex flex-col gap-8 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-500/20">
+                    <i data-lucide="shield" class="text-white w-6 h-6"></i>
+                </div>
+                <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                    CECIL
+                </span>
+            </div>
+
+            <nav class="flex-1 space-y-2">
+                <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-4 px-4">Pipeline</div>
+                <button onclick="setStep('source')" class="step-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-slate-800/50" data-step="source">
+                    <i data-lucide="database" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Source Connect</span>
+                </button>
+                <button onclick="setStep('mapping')" class="step-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-slate-800/50" data-step="mapping">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Field Mapping</span>
+                </button>
+                <button onclick="setStep('audit')" class="step-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-slate-800/50" data-step="audit">
+                    <i data-lucide="eye" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Audit Console</span>
+                </button>
+                
+                <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mt-8 mb-4 px-4">Output</div>
+                <button onclick="setStep('export')" class="step-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-slate-400 hover:bg-slate-800/50" data-step="export">
+                    <i data-lucide="download" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Local Export</span>
+                </button>
+            </nav>
+
+            <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-800">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span class="text-xs font-semibold text-slate-400">Local Engine Active</span>
+                </div>
+                <p class="text-[10px] text-slate-500 leading-relaxed">
+                    Cecil Binary v3.1.2<br/>
+                    Connected: 127.0.0.1:4921
+                </p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col bg-slate-950">
+            <header class="h-16 border-b border-slate-900 flex items-center justify-between px-8 bg-slate-950/50 backdrop-blur-md">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <span class="text-slate-500">Pipeline /</span>
+                    <span id="header-title">Source Connect</span>
+                </h2>
+                <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800">
+                    <i data-lucide="lock" class="w-3.5 h-3.5 text-emerald-500"></i>
+                    <span class="text-xs font-medium text-emerald-500">Safe-Pipe Verification: ON</span>
+                </div>
+            </header>
+
+            <div id="content-area" class="flex-1 overflow-y-auto p-8 custom-scroll">
+                <!-- Content will be injected here -->
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let currentStep = 'source';
+
+        const templates = {
+            source: `
+                <div class="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+                    <div class="space-y-2">
+                        <h1 class="text-3xl font-bold">Connect Data Source</h1>
+                        <p class="text-slate-400">Select where Cecil should fetch logs for local sanitization.</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div onclick="setStep('mapping')" class="group p-6 bg-slate-900 border border-slate-800 rounded-2xl hover:border-indigo-500/50 hover:bg-slate-800/40 transition-all cursor-pointer">
+                            <i data-lucide="cloud" class="w-8 h-8 text-slate-400 group-hover:text-indigo-400 mb-4"></i>
+                            <h3 class="font-bold text-lg">AWS CloudWatch</h3>
+                            <p class="text-sm text-slate-500 mt-1">Ingest logs via Boto3 (IAM required)</p>
+                        </div>
+                        <div onclick="setStep('mapping')" class="group p-6 bg-slate-900 border border-slate-800 rounded-2xl hover:border-indigo-500/50 hover:bg-slate-800/40 transition-all cursor-pointer">
+                            <i data-lucide="file-code" class="w-8 h-8 text-slate-400 group-hover:text-indigo-400 mb-4"></i>
+                            <h3 class="font-bold text-lg">Local Logs</h3>
+                            <p class="text-sm text-slate-500 mt-1">Sanitize JSONL, CSV, or Parquet</p>
+                        </div>
+                    </div>
+                </div>
+            `,
+            mapping: `
+                <div class="max-w-6xl mx-auto space-y-6">
+                    <h1 class="text-2xl font-bold">Deep Interceptor Mapping</h1>
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-950/50 text-slate-500 text-[10px] uppercase font-bold">
+                                <tr>
+                                    <th class="px-6 py-4">Field Path</th>
+                                    <th class="px-6 py-4">Type</th>
+                                    <th class="px-6 py-4">Sanitization Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800 text-sm">
+                                <tr>
+                                    <td class="px-6 py-4 font-mono text-indigo-300">choices[0].message.content</td>
+                                    <td class="px-6 py-4 text-slate-400">Unstructured Text</td>
+                                    <td class="px-6 py-4">
+                                        <select class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs outline-none focus:border-indigo-500">
+                                            <option>REDACT (NLP)</option>
+                                            <option>MASK (***)</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 font-mono text-indigo-300">user_id</td>
+                                    <td class="px-6 py-4 text-slate-400">Identifier</td>
+                                    <td class="px-6 py-4">
+                                        <select class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs outline-none focus:border-indigo-500">
+                                            <option>HASH (SHA-256)</option>
+                                            <option>KEEP</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-end">
+                        <button onclick="startProcessing()" id="process-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-600/20">
+                            Execute Safe-Pipe Scan
+                        </button>
+                    </div>
+                </div>
+            `,
+            audit: `
+                <div class="max-w-6xl mx-auto space-y-6">
+                    <div class="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="check-circle-2" class="text-emerald-500"></i>
+                            <span class="text-sm font-bold text-emerald-400">Sanitization Complete: 1,240 records processed.</span>
+                        </div>
+                        <button onclick="setStep('export')" class="bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold">Verify & Export</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 h-[400px]">
+                        <div class="bg-slate-900 border border-slate-800 rounded-2xl flex flex-col overflow-hidden">
+                            <div class="p-4 border-b border-slate-800 text-[10px] font-bold text-slate-500 uppercase">Original</div>
+                            <div class="p-4 font-mono text-[11px] text-slate-500 overflow-auto">
+                                { "user_id": "user_123", "msg": "Patient John Doe fever" }
+                            </div>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 rounded-2xl flex flex-col overflow-hidden">
+                            <div class="p-4 border-b border-slate-800 text-[10px] font-bold text-indigo-400 uppercase font-bold">Sanitized</div>
+                            <div class="p-4 font-mono text-[11px] text-indigo-100 overflow-auto">
+                                { "user_id": "a96b34...", "msg": "Patient [REDACTED] fever" }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `,
+            export: `
+                <div class="max-w-4xl mx-auto py-12 text-center space-y-8">
+                    <i data-lucide="check-circle-2" class="w-16 h-16 text-emerald-500 mx-auto"></i>
+                    <h1 class="text-4xl font-bold text-white">Your Data is Safe.</h1>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
+                        <div class="p-8 bg-slate-900 border border-slate-800 rounded-3xl text-left">
+                            <i data-lucide="download" class="text-indigo-400 w-8 h-8 mb-4"></i>
+                            <h3 class="text-xl font-bold mb-2">Local Download</h3>
+                            <p class="text-sm text-slate-500 mb-6">No data has left this computer. Save your sanitized file locally.</p>
+                            <button class="w-full py-4 bg-slate-800 rounded-2xl font-bold text-sm">Save .jsonl</button>
+                        </div>
+                        <div class="p-8 bg-indigo-600 rounded-3xl text-left shadow-xl shadow-indigo-500/20">
+                            <i data-lucide="bar-chart-3" class="text-white w-8 h-8 mb-4"></i>
+                            <h3 class="text-xl font-bold mb-2">Free Cost Analysis</h3>
+                            <p class="text-sm text-indigo-100 mb-6">We found $1,420 potential monthly savings. Generate the CFO PDF.</p>
+                            <input type="email" placeholder="Email for report" class="w-full bg-indigo-700 border border-indigo-500 rounded-xl px-4 py-3 mb-3 text-sm outline-none placeholder:text-indigo-300">
+                            <button class="w-full py-4 bg-white text-indigo-600 rounded-2xl font-bold text-sm shadow-lg">Generate PDF Report</button>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        function setStep(step) {
+            currentStep = step;
+            document.getElementById('content-area').innerHTML = templates[step];
+            document.getElementById('header-title').innerText = step.charAt(0).toUpperCase() + step.slice(1);
+            
+            document.querySelectorAll('.step-btn').forEach(btn => {
+                if(btn.dataset.step === step) {
+                    btn.classList.add('bg-slate-800', 'text-indigo-400', 'border', 'border-slate-700');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    btn.classList.remove('bg-slate-800', 'text-indigo-400', 'border', 'border-slate-700');
+                    btn.classList.add('text-slate-400');
+                }
+            });
+            
+            lucide.createIcons();
+        }
+
+        function startProcessing() {
+            const btn = document.getElementById('process-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="refresh-ccw" class="animate-spin w-5 h-5 mr-2"></i> Processing...';
+            lucide.createIcons();
+            setTimeout(() => setStep('audit'), 1500);
+        }
+
+        // Initialize
+        window.onload = () => setStep('source');
+    </script>
+</body>
+</html>

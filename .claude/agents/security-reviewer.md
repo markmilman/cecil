@@ -1,7 +1,7 @@
 ---
 name: security-reviewer
 description: Reviews code for security vulnerabilities, PII leak prevention, and Safe-Pipe integrity. Use proactively after code changes.
-tools: Read, Glob, Grep
+tools: Read, Bash, Glob, Grep
 model: opus
 ---
 
