@@ -1,7 +1,8 @@
 """Tests for StrictStrategy field-level redaction.
 
 Covers all redaction actions (KEEP, REDACT, MASK, HASH), unmapped field
-defaults, non-string value handling, and PII leak detection.
+defaults, non-string value handling, PII leak detection, and
+MappingConfig integration.
 """
 
 from __future__ import annotations
@@ -12,6 +13,8 @@ import pytest
 
 from cecil.core.sanitizer.models import (
     FieldMapping,
+    FieldMappingEntry,
+    MappingConfig,
     RedactionAction,
 )
 from cecil.core.sanitizer.strategies import StrictStrategy
@@ -613,3 +616,237 @@ class TestRedactUnknownActionFallback:
         s = StrictStrategy(mapping=mapping)
         dets = [Detection(entity_type="UNKNOWN", start=0, end=5, score=1.0)]
         assert s.redact("hello", dets) == "hello"
+
+
+# -- StrictStrategy with MappingConfig --------------------------------------
+
+
+class TestStrictStrategyWithMappingConfig:
+    """Tests for StrictStrategy constructed with a MappingConfig."""
+
+    @staticmethod
+    def _make_config(
+        fields: dict[str, FieldMappingEntry],
+        default_action: RedactionAction = RedactionAction.REDACT,
+    ) -> MappingConfig:
+        """Create a MappingConfig with the given fields and default.
+
+        Args:
+            fields: Mapping of field names to FieldMappingEntry configs.
+            default_action: Action for unmapped fields.
+
+        Returns:
+            A MappingConfig instance.
+        """
+        return MappingConfig(
+            version=1,
+            default_action=default_action,
+            fields=fields,
+        )
+
+    def test_config_keep_passes_through(self) -> None:
+        """KEEP action from MappingConfig passes the value unchanged."""
+        config = self._make_config(
+            {"model": FieldMappingEntry(action=RedactionAction.KEEP)},
+        )
+        s = StrictStrategy(config=config)
+        detections = s.scan_value("model", "gpt-4")
+        assert detections == []
+        result = s.redact("gpt-4", detections)
+        assert result == "gpt-4"
+
+    def test_config_redact_replaces_with_placeholder(self) -> None:
+        """REDACT action from MappingConfig replaces with [FIELD_REDACTED]."""
+        config = self._make_config(
+            {"email": FieldMappingEntry(action=RedactionAction.REDACT)},
+        )
+        s = StrictStrategy(config=config)
+        value = "john@example.com"
+        detections = s.scan_value("email", value)
+        result = s.redact(value, detections)
+        assert result == "[EMAIL_REDACTED]"
+
+    def test_config_mask_partially_hides(self) -> None:
+        """MASK action from MappingConfig partially hides the value."""
+        config = self._make_config(
+            {"name": FieldMappingEntry(action=RedactionAction.MASK)},
+        )
+        s = StrictStrategy(config=config)
+        value = "John Doe"
+        detections = s.scan_value("name", value)
+        result = s.redact(value, detections)
+        assert result == "J***e"
+
+    def test_config_mask_with_preserve_domain_option(self) -> None:
+        """MASK with preserve_domain option delegates to apply_action correctly."""
+        config = self._make_config(
+            {
+                "user_email": FieldMappingEntry(
+                    action=RedactionAction.MASK,
+                    options={"preserve_domain": True},
+                ),
+            },
+        )
+        s = StrictStrategy(config=config)
+        value = "alice@example.com"
+        detections = s.scan_value("user_email", value)
+        result = s.redact(value, detections)
+        assert result == "a***@example.com"
+        assert "alice" not in result
+
+    def test_config_hash_is_deterministic(self) -> None:
+        """HASH action from MappingConfig produces deterministic output."""
+        config = self._make_config(
+            {"session_id": FieldMappingEntry(action=RedactionAction.HASH)},
+        )
+        s = StrictStrategy(config=config)
+        value = "sess-abc-123"
+        d1 = s.scan_value("session_id", value)
+        r1 = s.redact(value, d1)
+        d2 = s.scan_value("session_id", value)
+        r2 = s.redact(value, d2)
+        assert r1 == r2
+        assert r1.startswith("hash_")
+        expected = hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+        assert r1 == f"hash_{expected}"
+
+    def test_config_unmapped_field_gets_default_action(self) -> None:
+        """Unmapped fields use config.default_action (default: REDACT)."""
+        config = self._make_config(
+            {"name": FieldMappingEntry(action=RedactionAction.KEEP)},
+            default_action=RedactionAction.REDACT,
+        )
+        s = StrictStrategy(config=config)
+        value = "secret-data"
+        detections = s.scan_value("unknown_field", value)
+        assert len(detections) == 1
+        assert detections[0].entity_type == "REDACT"
+        result = s.redact(value, detections)
+        assert result == "[UNKNOWN_FIELD_REDACTED]"
+        assert "secret-data" not in result
+
+    def test_config_default_action_keep_passes_unmapped_through(self) -> None:
+        """When default_action is KEEP, unmapped fields pass through."""
+        config = self._make_config(
+            {"email": FieldMappingEntry(action=RedactionAction.REDACT)},
+            default_action=RedactionAction.KEEP,
+        )
+        s = StrictStrategy(config=config)
+        detections = s.scan_value("unknown_field", "some value")
+        assert detections == []
+        result = s.redact("some value", detections)
+        assert result == "some value"
+
+    def test_config_all_mapped_fields_processed(self) -> None:
+        """All mapped fields in a MappingConfig are processed correctly."""
+        config = self._make_config(
+            {
+                "email": FieldMappingEntry(action=RedactionAction.REDACT),
+                "name": FieldMappingEntry(action=RedactionAction.MASK),
+                "user_id": FieldMappingEntry(action=RedactionAction.HASH),
+                "model": FieldMappingEntry(action=RedactionAction.KEEP),
+            },
+        )
+        s = StrictStrategy(config=config)
+
+        record = {
+            "email": "john@example.com",
+            "name": "John Doe",
+            "user_id": "uid-42",
+            "model": "gpt-4",
+        }
+
+        results: dict[str, str] = {}
+        for key, value in record.items():
+            detections = s.scan_value(key, value)
+            results[key] = s.redact(value, detections)
+
+        assert results["email"] == "[EMAIL_REDACTED]"
+        assert results["name"] == "J***e"
+        assert results["user_id"].startswith("hash_")
+        assert results["model"] == "gpt-4"
+
+    def test_config_pii_absent_from_redacted_output(self) -> None:
+        """PII values must not appear in any redacted output."""
+        config = self._make_config(
+            {
+                "email": FieldMappingEntry(action=RedactionAction.REDACT),
+                "ssn": FieldMappingEntry(action=RedactionAction.REDACT),
+                "name": FieldMappingEntry(action=RedactionAction.MASK),
+                "phone": FieldMappingEntry(action=RedactionAction.MASK),
+                "api_key": FieldMappingEntry(action=RedactionAction.HASH),
+            },
+        )
+        s = StrictStrategy(config=config)
+
+        pii_data = {
+            "email": "john.doe@example.com",
+            "ssn": "123-45-6789",
+            "name": "John Doe",
+            "phone": "(555) 867-5309",
+            "api_key": "sk-1234567890abcdef",
+        }
+
+        for key, pii_value in pii_data.items():
+            detections = s.scan_value(key, pii_value)
+            result = s.redact(pii_value, detections)
+            assert pii_value not in result, f"PII leaked for field {key!r}: {result!r}"
+
+    def test_config_without_mapping_or_config_redacts_all(self) -> None:
+        """StrictStrategy with no mapping or config defaults to REDACT all."""
+        s = StrictStrategy()
+        value = "some-data"
+        detections = s.scan_value("any_field", value)
+        assert len(detections) == 1
+        assert detections[0].entity_type == "REDACT"
+        result = s.redact(value, detections)
+        assert result == "[ANY_FIELD_REDACTED]"
+        assert "some-data" not in result
+
+
+# -- MappingConfig redact path for unmapped field with options ----------------
+
+
+class TestStrictStrategyConfigUnmappedFieldRedact:
+    """When MappingConfig is used and field is unmapped, options is empty."""
+
+    def test_config_unmapped_field_redact_delegates_to_apply_action(self) -> None:
+        """Unmapped field with MappingConfig uses apply_action with empty options."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={"email": FieldMappingEntry(action=RedactionAction.KEEP)},
+        )
+        s = StrictStrategy(config=config)
+        pii = "sensitive-unmapped-data"
+        detections = s.scan_value("unknown", pii)
+        result = s.redact(pii, detections)
+        assert result == "[UNKNOWN_REDACTED]"
+        assert pii not in result
+
+    def test_config_unmapped_field_hash_via_default(self) -> None:
+        """When default_action is HASH, unmapped fields get hashed."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.HASH,
+            fields={"email": FieldMappingEntry(action=RedactionAction.KEEP)},
+        )
+        s = StrictStrategy(config=config)
+        pii = "unmapped-secret-value"
+        detections = s.scan_value("unknown", pii)
+        result = s.redact(pii, detections)
+        assert result.startswith("hash_")
+        assert pii not in result
+
+    def test_config_unmapped_field_mask_via_default(self) -> None:
+        """When default_action is MASK, unmapped fields get masked."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.MASK,
+            fields={"email": FieldMappingEntry(action=RedactionAction.KEEP)},
+        )
+        s = StrictStrategy(config=config)
+        pii = "sensitive-long-value"
+        detections = s.scan_value("unknown", pii)
+        result = s.redact(pii, detections)
+        assert pii not in result

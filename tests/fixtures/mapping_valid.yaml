@@ -1,0 +1,15 @@
+version: 1
+default_action: REDACT
+
+fields:
+  user_email:
+    action: MASK
+    preserve_domain: true
+  session_id:
+    action: HASH
+  request_body:
+    action: REDACT
+  model_name:
+    action: KEEP
+  timestamp:
+    action: KEEP

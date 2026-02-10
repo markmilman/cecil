@@ -15,7 +15,14 @@ import logging
 import re
 from typing import Any
 
-from cecil.core.sanitizer.models import Detection, FieldMapping, RedactionAction
+from cecil.core.sanitizer.actions import apply_action
+from cecil.core.sanitizer.models import (
+    Detection,
+    FieldMapping,
+    FieldMappingEntry,
+    MappingConfig,
+    RedactionAction,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -130,11 +137,23 @@ class RedactionStrategy(abc.ABC):
 
 
 class StrictStrategy(RedactionStrategy):
-    """Field-level redaction strategy driven by a ``FieldMapping``.
+    """Field-level redaction strategy driven by a ``FieldMapping`` or ``MappingConfig``.
 
     The StrictStrategy applies a per-field action based on an explicit
     mapping configuration.  Fields not present in the mapping default
-    to ``REDACT`` (safe by default).
+    to the configured default action (``REDACT`` when using a
+    ``FieldMapping``, or ``config.default_action`` when using a
+    ``MappingConfig``).
+
+    The strategy can be constructed in two ways:
+
+    * **Legacy**: Pass a ``FieldMapping`` directly via the *mapping*
+      parameter.  Redaction is handled by the internal ``_apply_*``
+      helper methods.
+    * **Config-based**: Pass a ``MappingConfig`` via the *config*
+      keyword argument.  Redaction delegates to ``apply_action()``
+      from ``cecil.core.sanitizer.actions``, which supports
+      per-field options (e.g., ``preserve_domain`` for MASK).
 
     Supported actions:
 
@@ -151,14 +170,37 @@ class StrictStrategy(RedactionStrategy):
 
     Args:
         mapping: A ``FieldMapping`` that assigns a ``RedactionAction``
-            to each known field name.
+            to each known field name.  Mutually exclusive with *config*
+            when both would be ambiguous, but *config* takes precedence.
+        config: A ``MappingConfig`` parsed from a mapping YAML file.
+            When provided, the internal ``FieldMapping`` is built from
+            ``config.fields`` and ``config.default_action`` is used for
+            unmapped fields.
 
     Attributes:
         mapping: The field mapping used to determine per-field actions.
     """
 
-    def __init__(self, mapping: FieldMapping) -> None:
-        self.mapping: FieldMapping = mapping
+    def __init__(
+        self,
+        mapping: FieldMapping | None = None,
+        *,
+        config: MappingConfig | None = None,
+    ) -> None:
+        self._config: MappingConfig | None = config
+
+        if config is not None:
+            self.mapping: FieldMapping = FieldMapping(
+                {name: entry.action for name, entry in config.fields.items()},
+            )
+            self._default_action: RedactionAction = config.default_action
+        elif mapping is not None:
+            self.mapping = mapping
+            self._default_action = RedactionAction.REDACT
+        else:
+            self.mapping = FieldMapping()
+            self._default_action = RedactionAction.REDACT
+
         self._last_key: str = ""
 
     def scan_value(self, key: str, value: Any) -> list[Detection]:
@@ -183,9 +225,9 @@ class StrictStrategy(RedactionStrategy):
         """
         self._last_key = key
 
-        action = self.mapping.get(key, RedactionAction.REDACT)
+        action = self.mapping.get(key, self._default_action)
         if action is None:
-            action = RedactionAction.REDACT
+            action = self._default_action
 
         if action is RedactionAction.KEEP:
             return []
@@ -214,8 +256,13 @@ class StrictStrategy(RedactionStrategy):
         If no detections are provided (i.e., the field was ``KEEP``),
         the original value is returned unchanged.
 
-        For each detection, the ``entity_type`` field determines the
-        action to apply:
+        When a ``MappingConfig`` was provided at construction time, the
+        actual redaction is delegated to ``apply_action()`` from
+        ``cecil.core.sanitizer.actions``, which supports per-field
+        options (e.g., ``preserve_domain`` for MASK).
+
+        For the legacy ``FieldMapping`` path, the ``entity_type`` field
+        on the detection determines the action to apply:
 
         * ``"REDACT"`` -- replaces with ``[KEY_REDACTED]``
         * ``"MASK"`` -- partially hides the value
@@ -234,6 +281,21 @@ class StrictStrategy(RedactionStrategy):
         detection = detections[0]
         action_name = detection.entity_type
 
+        # When using MappingConfig, delegate to apply_action with options.
+        if self._config is not None:
+            action_enum = RedactionAction[action_name]
+            field_entry: FieldMappingEntry | None = self._config.fields.get(
+                self._last_key,
+            )
+            options = field_entry.options if field_entry else {}
+            return apply_action(
+                value,
+                action_enum,
+                self._last_key,
+                options=options,
+            )
+
+        # Legacy FieldMapping path (unchanged behavior).
         if action_name == RedactionAction.REDACT.name:
             return self._apply_redact(value)
         if action_name == RedactionAction.MASK.name:

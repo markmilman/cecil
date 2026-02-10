@@ -657,3 +657,152 @@ class TestDeduplicateOverlapReplacement:
         result = DeepInterceptorStrategy._deduplicate([short, long])
         assert len(result) == 1
         assert result[0].entity_type == "LONG"
+
+
+# -- PII leak assertions for scan+redact paths --------------------------------
+
+
+class TestDeepInterceptorPIILeakAssertions:
+    """Explicit PII leak assertions for all detection+redaction paths."""
+
+    @pytest.fixture()
+    def strategy(self) -> DeepInterceptorStrategy:
+        """Return a DeepInterceptorStrategy instance."""
+        return DeepInterceptorStrategy()
+
+    def test_email_pii_absent_after_redact(
+        self,
+        strategy: DeepInterceptorStrategy,
+    ) -> None:
+        """Email addresses must not survive redaction."""
+        pii = "john.doe@example.com"
+        value = f"Contact {pii} please"
+        detections = strategy.scan_value("body", value)
+        result = strategy.redact(value, detections)
+        assert pii not in result
+
+    def test_phone_pii_absent_after_redact(
+        self,
+        strategy: DeepInterceptorStrategy,
+    ) -> None:
+        """Phone numbers must not survive redaction."""
+        pii = "(555) 867-5309"
+        value = f"Call me at {pii}"
+        detections = strategy.scan_value("notes", value)
+        if detections:
+            result = strategy.redact(value, detections)
+            assert pii not in result
+
+    def test_credit_card_pii_absent_after_redact(
+        self,
+        strategy: DeepInterceptorStrategy,
+    ) -> None:
+        """Credit card numbers must not survive redaction."""
+        pii = "4111-1111-1111-1111"
+        value = f"Card: {pii}"
+        detections = strategy.scan_value("payment", value)
+        if detections:
+            result = strategy.redact(value, detections)
+            assert pii not in result
+
+    def test_ip_address_pii_absent_after_redact(
+        self,
+        strategy: DeepInterceptorStrategy,
+    ) -> None:
+        """IP addresses must not survive redaction."""
+        pii = "192.168.1.42"
+        value = f"From IP {pii}"
+        detections = strategy.scan_value("source", value)
+        if detections:
+            result = strategy.redact(value, detections)
+            assert pii not in result
+
+    def test_aws_key_pii_absent_after_redact(
+        self,
+        strategy: DeepInterceptorStrategy,
+    ) -> None:
+        """AWS access keys must not survive redaction."""
+        pii = "AKIAIOSFODNN7EXAMPLE"
+        value = f"Key: {pii}"
+        detections = strategy.scan_value("config", value)
+        result = strategy.redact(value, detections)
+        assert pii not in result
+
+    def test_sensitive_key_value_pii_absent_after_redact(
+        self,
+        strategy: DeepInterceptorStrategy,
+    ) -> None:
+        """Values under sensitive keys must not survive redaction."""
+        pii = "my-super-secret-password-123"
+        detections = strategy.scan_value("password", pii)
+        result = strategy.redact(pii, detections)
+        assert pii not in result
+
+    def test_nested_dict_pii_detected(
+        self,
+        strategy: DeepInterceptorStrategy,
+    ) -> None:
+        """PII embedded in nested dict values is detected and redactable."""
+        pii = "jane.smith@corp.com"
+        nested = {"contact": pii, "safe": "hello"}
+        detections = strategy.scan_value("metadata", nested)
+        emails = [d for d in detections if d.entity_type == "EMAIL_ADDRESS"]
+        assert len(emails) >= 1
+
+    def test_nested_list_pii_detected(
+        self,
+        strategy: DeepInterceptorStrategy,
+    ) -> None:
+        """PII embedded in list values is detected and redactable."""
+        pii = "bob.jones@example.org"
+        values = [pii, "safe-value"]
+        detections = strategy.scan_value("contacts", values)
+        emails = [d for d in detections if d.entity_type == "EMAIL_ADDRESS"]
+        assert len(emails) >= 1
+
+
+# -- Edge case: OSError fallback for Presidio ---------------------------------
+
+
+class TestPresidioOSErrorFallback:
+    """Verify OSError fallback path for Presidio initialization."""
+
+    def test_oserror_fallback_still_detects_sensitive_keys(self) -> None:
+        """OSError (e.g., missing spaCy model) triggers regex-only fallback."""
+        with patch(
+            "cecil.core.sanitizer.strategies._create_presidio_analyzer",
+            side_effect=OSError("Missing spaCy model"),
+        ):
+            strategy = DeepInterceptorStrategy()
+            detections = strategy.scan_value("api_key", "my-secret")
+            sensitive = [d for d in detections if d.entity_type == "SENSITIVE_KEY"]
+            assert len(sensitive) == 1
+
+    def test_oserror_fallback_still_detects_aws_keys(self) -> None:
+        """OSError fallback still runs custom regex for AWS keys."""
+        with patch(
+            "cecil.core.sanitizer.strategies._create_presidio_analyzer",
+            side_effect=OSError("Missing spaCy model"),
+        ):
+            strategy = DeepInterceptorStrategy()
+            pii = "AKIAIOSFODNN7EXAMPLE"
+            detections = strategy.scan_value("config", pii)
+            aws = [d for d in detections if d.entity_type == "AWS_ACCESS_KEY"]
+            assert len(aws) >= 1
+
+    def test_oserror_fallback_logs_warning(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """OSError during Presidio init is logged as a warning."""
+        with patch(
+            "cecil.core.sanitizer.strategies._create_presidio_analyzer",
+            side_effect=OSError("Missing spaCy model"),
+        ):
+            with caplog.at_level(
+                logging.WARNING,
+                logger="cecil.core.sanitizer.strategies",
+            ):
+                strategy = DeepInterceptorStrategy()
+                strategy.scan_value("field", "value")
+            assert any("presidio" in r.message.lower() for r in caplog.records)

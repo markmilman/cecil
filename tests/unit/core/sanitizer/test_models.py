@@ -16,14 +16,24 @@ import pytest
 from cecil.core.sanitizer.models import (
     Detection,
     FieldMapping,
+    FieldMappingEntry,
     FieldRedaction,
+    MappingConfig,
+    MappingValidationResult,
     RedactionAction,
     RedactionAudit,
     SanitizedRecord,
     StreamErrorPolicy,
 )
 from cecil.core.sanitizer.strategies import RedactionStrategy
-from cecil.utils.errors import CecilError, RecordSanitizationError, SanitizationError
+from cecil.utils.errors import (
+    CecilError,
+    MappingError,
+    MappingFileError,
+    MappingValidationError,
+    RecordSanitizationError,
+    SanitizationError,
+)
 
 
 # -- RedactionAction enum ---------------------------------------------------
@@ -503,3 +513,234 @@ class TestRecordSanitizationError:
         """The error message is preserved in the exception string."""
         err = RecordSanitizationError("field parse failure in record abc-123")
         assert "abc-123" in str(err)
+
+
+# -- FieldMappingEntry dataclass -----------------------------------------------
+
+
+class TestFieldMappingEntry:
+    """Tests for the FieldMappingEntry frozen dataclass."""
+
+    def test_field_mapping_entry_creation_stores_action_and_options(self) -> None:
+        """A FieldMappingEntry stores the action and custom options."""
+        entry = FieldMappingEntry(
+            action=RedactionAction.MASK,
+            options={"preserve_domain": True},
+        )
+        assert entry.action is RedactionAction.MASK
+        assert entry.options == {"preserve_domain": True}
+
+    def test_field_mapping_entry_default_options_empty_dict(self) -> None:
+        """When no options are provided, the default is an empty dict."""
+        entry = FieldMappingEntry(action=RedactionAction.REDACT)
+        assert entry.options == {}
+
+    def test_field_mapping_entry_frozen_raises_on_assignment(self) -> None:
+        """Attempting to mutate any attribute raises AttributeError."""
+        entry = FieldMappingEntry(action=RedactionAction.KEEP)
+        with pytest.raises(AttributeError):
+            entry.action = RedactionAction.HASH  # type: ignore[misc]
+
+
+# -- MappingConfig dataclass ---------------------------------------------------
+
+
+class TestMappingConfig:
+    """Tests for the MappingConfig frozen dataclass."""
+
+    def test_mapping_config_creation_stores_all_fields(self) -> None:
+        """A MappingConfig stores version, default_action, and fields."""
+        fields = {
+            "email": FieldMappingEntry(action=RedactionAction.REDACT),
+            "name": FieldMappingEntry(
+                action=RedactionAction.MASK,
+                options={"preserve_first": True},
+            ),
+        }
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.KEEP,
+            fields=fields,
+        )
+        assert config.version == 1
+        assert config.default_action is RedactionAction.KEEP
+        assert len(config.fields) == 2
+        assert config.fields["email"].action is RedactionAction.REDACT
+        assert config.fields["name"].options == {"preserve_first": True}
+
+    def test_mapping_config_policy_hash_returns_hex_string(self) -> None:
+        """policy_hash() returns a 64-character hexadecimal SHA-256 digest."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.KEEP,
+            fields={
+                "email": FieldMappingEntry(action=RedactionAction.REDACT),
+            },
+        )
+        h = config.policy_hash()
+        assert isinstance(h, str)
+        assert len(h) == 64
+        # Verify it's a valid hex string
+        int(h, 16)
+
+    def test_mapping_config_policy_hash_deterministic_same_config(self) -> None:
+        """The same config produces the same hash on repeated calls."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={
+                "ssn": FieldMappingEntry(action=RedactionAction.REDACT),
+                "email": FieldMappingEntry(action=RedactionAction.MASK),
+            },
+        )
+        assert config.policy_hash() == config.policy_hash()
+
+    def test_mapping_config_policy_hash_differs_for_different_configs(self) -> None:
+        """Two configs with different fields produce different hashes."""
+        config_a = MappingConfig(
+            version=1,
+            default_action=RedactionAction.KEEP,
+            fields={
+                "email": FieldMappingEntry(action=RedactionAction.REDACT),
+            },
+        )
+        config_b = MappingConfig(
+            version=1,
+            default_action=RedactionAction.KEEP,
+            fields={
+                "email": FieldMappingEntry(action=RedactionAction.MASK),
+            },
+        )
+        assert config_a.policy_hash() != config_b.policy_hash()
+
+    def test_mapping_config_frozen_raises_on_assignment(self) -> None:
+        """Attempting to mutate any attribute raises AttributeError."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.KEEP,
+            fields={},
+        )
+        with pytest.raises(AttributeError):
+            config.version = 2  # type: ignore[misc]
+
+
+# -- MappingValidationResult dataclass ----------------------------------------
+
+
+class TestMappingValidationResult:
+    """Tests for the MappingValidationResult frozen dataclass."""
+
+    def test_mapping_validation_result_is_valid_true_when_no_missing(self) -> None:
+        """is_valid is True when missing_fields is empty."""
+        result = MappingValidationResult(
+            matched_fields=["email", "name"],
+            unmapped_fields=["model"],
+            missing_fields=[],
+        )
+        assert result.is_valid is True
+
+    def test_mapping_validation_result_is_valid_false_when_missing_fields(self) -> None:
+        """is_valid is False when missing_fields is non-empty."""
+        result = MappingValidationResult(
+            matched_fields=["email"],
+            unmapped_fields=[],
+            missing_fields=["ssn"],
+        )
+        assert result.is_valid is False
+
+    def test_mapping_validation_result_stores_all_field_lists(self) -> None:
+        """All three field lists are stored and accessible."""
+        result = MappingValidationResult(
+            matched_fields=["email", "name"],
+            unmapped_fields=["model", "timestamp"],
+            missing_fields=["ssn"],
+        )
+        assert result.matched_fields == ["email", "name"]
+        assert result.unmapped_fields == ["model", "timestamp"]
+        assert result.missing_fields == ["ssn"]
+
+
+# -- Mapping error hierarchy ---------------------------------------------------
+
+
+class TestMappingErrors:
+    """Tests for the mapping-specific error classes."""
+
+    def test_mapping_error_inherits_from_sanitization_error(self) -> None:
+        """MappingError is a subclass of SanitizationError."""
+        assert issubclass(MappingError, SanitizationError)
+
+    def test_mapping_validation_error_inherits_from_mapping_error(self) -> None:
+        """MappingValidationError is a subclass of MappingError."""
+        assert issubclass(MappingValidationError, MappingError)
+
+    def test_mapping_file_error_inherits_from_mapping_error(self) -> None:
+        """MappingFileError is a subclass of MappingError."""
+        assert issubclass(MappingFileError, MappingError)
+
+    def test_mapping_error_can_be_caught_as_cecil_error(self) -> None:
+        """All mapping errors can be caught with except CecilError."""
+        with pytest.raises(CecilError):
+            raise MappingError("mapping issue")
+
+    def test_mapping_validation_error_can_be_caught_as_cecil_error(self) -> None:
+        """MappingValidationError can be caught with except CecilError."""
+        with pytest.raises(CecilError):
+            raise MappingValidationError("invalid schema")
+
+    def test_mapping_file_error_can_be_caught_as_cecil_error(self) -> None:
+        """MappingFileError can be caught with except CecilError."""
+        with pytest.raises(CecilError):
+            raise MappingFileError("cannot read file")
+
+
+# -- MappingConfig policy_hash with multiple fields ----------------------------
+
+
+class TestMappingConfigPolicyHashMultiField:
+    """Verify policy_hash covers multiple fields and options."""
+
+    def test_policy_hash_includes_options_in_digest(self) -> None:
+        """Options are part of the hash payload so they affect the digest."""
+        config_with_opts = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={
+                "email": FieldMappingEntry(
+                    action=RedactionAction.MASK,
+                    options={"preserve_domain": True},
+                ),
+            },
+        )
+        config_without_opts = MappingConfig(
+            version=1,
+            default_action=RedactionAction.REDACT,
+            fields={
+                "email": FieldMappingEntry(
+                    action=RedactionAction.MASK,
+                    options={},
+                ),
+            },
+        )
+        assert config_with_opts.policy_hash() != config_without_opts.policy_hash()
+
+    def test_policy_hash_empty_fields_is_valid(self) -> None:
+        """policy_hash on a config with no fields produces a valid hex digest."""
+        config = MappingConfig(
+            version=1,
+            default_action=RedactionAction.KEEP,
+            fields={},
+        )
+        h = config.policy_hash()
+        assert len(h) == 64
+        int(h, 16)  # Must be valid hex
+
+    def test_mapping_validation_result_frozen_raises_on_assignment(self) -> None:
+        """MappingValidationResult is frozen and cannot be mutated."""
+        result = MappingValidationResult(
+            matched_fields=["a"],
+            unmapped_fields=["b"],
+            missing_fields=["c"],
+        )
+        with pytest.raises(AttributeError):
+            result.matched_fields = []  # type: ignore[misc]
