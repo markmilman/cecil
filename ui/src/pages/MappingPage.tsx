@@ -27,8 +27,6 @@ export function MappingPage() {
           icon={<MapIcon />}
           title="No Active Scan"
           description="Run a scan on the Ingest page first, then return here to configure sanitization mappings for your data fields."
-          actionLabel="Go to Ingest"
-          actionHref="/ingest"
         />
       </div>
     </div>

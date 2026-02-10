@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
 import { IngestPage } from './IngestPage';
 import { getErrorMessage } from '@/lib/errorMessages';
 
@@ -14,32 +13,32 @@ vi.mock('@/components/ingestion/FileBrowserModal', () => ({
 
 describe('IngestPage', () => {
   it('renders the page heading', () => {
-    render(<BrowserRouter><IngestPage /></BrowserRouter>);
+    render(<IngestPage />);
     expect(screen.getByText('File Ingestion')).toBeInTheDocument();
   });
 
   it('renders the file picker with Browse Files button', () => {
-    render(<BrowserRouter><IngestPage /></BrowserRouter>);
+    render(<IngestPage />);
     expect(screen.getByText('Browse Files')).toBeInTheDocument();
   });
 
   it('renders the file picker empty state heading', () => {
-    render(<BrowserRouter><IngestPage /></BrowserRouter>);
+    render(<IngestPage />);
     expect(screen.getByText('Select a Data File to Get Started')).toBeInTheDocument();
   });
 
   it('renders the format selector', () => {
-    render(<BrowserRouter><IngestPage /></BrowserRouter>);
+    render(<IngestPage />);
     expect(screen.getByText('File Format')).toBeInTheDocument();
   });
 
   it('renders the submit button', () => {
-    render(<BrowserRouter><IngestPage /></BrowserRouter>);
+    render(<IngestPage />);
     expect(screen.getByText('Start Scan')).toBeInTheDocument();
   });
 
   it('disables submit button when no file is selected', () => {
-    render(<BrowserRouter><IngestPage /></BrowserRouter>);
+    render(<IngestPage />);
     expect(screen.getByText('Start Scan')).toBeDisabled();
   });
 });

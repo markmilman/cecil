@@ -3,6 +3,17 @@
  */
 
 /**
+ * Top-level views rendered in the main content area.
+ * The app uses state-driven view switching rather than a router.
+ */
+export type ActiveView = 'dashboard' | 'wizard';
+
+/**
+ * Steps within the ingestion wizard flow.
+ */
+export type WizardStep = 1 | 2 | 3 | 4;
+
+/**
  * Navigation route definition
  */
 export interface Route {

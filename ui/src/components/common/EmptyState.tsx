@@ -2,19 +2,17 @@
  * EmptyState component
  *
  * Reusable empty state display with circular icon badge, heading,
- * description, and optional CTA button/link. Used on pages that have
+ * description, and optional CTA button. Used on pages that have
  * no data yet to guide users to the next action.
  */
 
 import { type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 
 interface EmptyStateProps {
   icon: ReactNode;
   title: string;
   description: string;
   actionLabel?: string;
-  actionHref?: string;
   onAction?: () => void;
 }
 
@@ -23,7 +21,6 @@ export function EmptyState({
   title,
   description,
   actionLabel,
-  actionHref,
   onAction,
 }: EmptyStateProps) {
   return (
@@ -43,17 +40,7 @@ export function EmptyState({
         <p className="text-slate-600 mt-2 max-w-md leading-relaxed">{description}</p>
 
         {/* CTA */}
-        {actionLabel && actionHref && (
-          <Link
-            to={actionHref}
-            className="mt-6 px-6 py-3 bg-accent hover:bg-indigo-700 text-white rounded-lg font-medium
-              transition-all duration-150 ease-out active:scale-[0.98]
-              focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-          >
-            {actionLabel}
-          </Link>
-        )}
-        {actionLabel && onAction && !actionHref && (
+        {actionLabel && onAction && (
           <button
             type="button"
             onClick={onAction}
