@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
 import { Shell } from '@/components/common/Shell';
+import { DashboardPage } from '@/pages/DashboardPage';
 
 import type { ActiveView } from '@/types';
 
@@ -42,45 +43,7 @@ export function App() {
           }}
         >
           {activeView === 'dashboard' && (
-            <div>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '24px',
-                }}
-              >
-                <div>
-                  <h2
-                    style={{
-                      margin: 0,
-                      fontSize: '24px',
-                      color: 'var(--text-primary)',
-                    }}
-                  >
-                    Audit Dashboard
-                  </h2>
-                  <p
-                    style={{
-                      margin: '4px 0 0',
-                      color: 'var(--text-secondary)',
-                      fontSize: '14px',
-                    }}
-                  >
-                    Overview of recent sanitization jobs and PII detection.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleStartWizard}
-                >
-                  <span style={{ fontSize: '18px' }}>+</span> New Sanitization Job
-                </button>
-              </div>
-              {/* Stats grid and job history table will be added by subsequent sub-issues */}
-            </div>
+            <DashboardPage onStartWizard={handleStartWizard} />
           )}
           {activeView === 'wizard' && (
             <div>
