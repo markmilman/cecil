@@ -8,13 +8,15 @@ interface CompletionViewProps {
   onBackToDashboard: () => void;
   onOpenFolder?: () => void;
   onGetReport?: () => void;
+  recordsProcessed?: number;
+  recordsSanitized?: number;
 }
 
 /**
- * Wizard Step 4: Completion view.
+ * Wizard Step 5: Completion view.
  *
  * Shows a success header with green checkmark circle, "Sanitization
- * Complete" heading, subtitle with file count, and "Back to Dashboard"
+ * Complete" heading, subtitle with file/record count, and "Back to Dashboard"
  * button. Below is a 2-column grid with LocalOutputCard (left) and
  * CostAnalysisCTA (right).
  */
@@ -24,6 +26,8 @@ export function CompletionView({
   onBackToDashboard,
   onOpenFolder,
   onGetReport,
+  recordsProcessed,
+  recordsSanitized,
 }: CompletionViewProps) {
   return (
     <div>
@@ -62,7 +66,10 @@ export function CompletionView({
               fontSize: '14px',
             }}
           >
-            {fileCount} {fileCount === 1 ? 'file has' : 'files have'} been processed and saved locally.
+            {recordsProcessed !== undefined
+              ? `${recordsProcessed} records processed, ${recordsSanitized ?? 0} sanitized.`
+              : `${fileCount} ${fileCount === 1 ? 'file has' : 'files have'} been processed and saved locally.`
+            }
           </p>
         </div>
         <button

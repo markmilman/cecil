@@ -104,7 +104,7 @@ describe('QueuedFiles', () => {
         onSanitize={onSanitize}
       />,
     );
-    fireEvent.click(screen.getByText('Sanitize 2 Files'));
+    fireEvent.click(screen.getByText('Next: Configure Mapping'));
     expect(onSanitize).toHaveBeenCalledOnce();
   });
 
@@ -117,7 +117,7 @@ describe('QueuedFiles', () => {
         onSanitize={vi.fn()}
       />,
     );
-    expect(screen.getByText('Sanitize 0 Files')).toBeDisabled();
+    expect(screen.getByText('Next: Configure Mapping')).toBeDisabled();
   });
 
   it('renders trust badge', () => {

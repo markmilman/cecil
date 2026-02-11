@@ -1,5 +1,19 @@
 import axios, { type AxiosInstance, type AxiosError } from 'axios';
-import type { BrowseResponse, ScanRequest, ScanResponse, UploadResponse } from '@/types';
+import type {
+  BrowseResponse,
+  ScanRequest,
+  ScanResponse,
+  UploadResponse,
+  MappingConfigRequest,
+  MappingConfigResponse,
+  MappingValidationRequest,
+  MappingValidationResult,
+  FieldPreviewResponse,
+  FieldMappingEntry,
+  SampleRecordResponse,
+  SanitizeRequest,
+  SanitizeResponse,
+} from '@/types';
 
 /**
  * Configuration for the API client
@@ -163,6 +177,151 @@ export class ApiClient {
       '/api/v1/filesystem/upload',
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  }
+
+  /**
+   * Create a new mapping configuration
+   *
+   * @param request - Mapping configuration payload
+   * @returns Created mapping configuration with ID and policy hash
+   * @throws {ApiClientError} If the creation fails
+   */
+  async createMapping(request: MappingConfigRequest): Promise<MappingConfigResponse> {
+    const response = await this.client.post<MappingConfigResponse>(
+      '/api/v1/mappings/',
+      request,
+    );
+    return response.data;
+  }
+
+  /**
+   * List all mapping configurations
+   *
+   * @returns Array of mapping configurations
+   * @throws {ApiClientError} If the request fails
+   */
+  async listMappings(): Promise<MappingConfigResponse[]> {
+    const response = await this.client.get<MappingConfigResponse[]>('/api/v1/mappings/');
+    return response.data;
+  }
+
+  /**
+   * Get a specific mapping configuration by ID
+   *
+   * @param mappingId - Unique mapping identifier
+   * @returns Mapping configuration
+   * @throws {ApiClientError} If the mapping is not found
+   */
+  async getMapping(mappingId: string): Promise<MappingConfigResponse> {
+    const response = await this.client.get<MappingConfigResponse>(
+      `/api/v1/mappings/${mappingId}`,
+    );
+    return response.data;
+  }
+
+  /**
+   * Update an existing mapping configuration
+   *
+   * @param mappingId - Unique mapping identifier
+   * @param request - Updated mapping configuration payload
+   * @returns Updated mapping configuration
+   * @throws {ApiClientError} If the update fails
+   */
+  async updateMapping(
+    mappingId: string,
+    request: MappingConfigRequest,
+  ): Promise<MappingConfigResponse> {
+    const response = await this.client.put<MappingConfigResponse>(
+      `/api/v1/mappings/${mappingId}`,
+      request,
+    );
+    return response.data;
+  }
+
+  /**
+   * Delete a mapping configuration
+   *
+   * @param mappingId - Unique mapping identifier
+   * @throws {ApiClientError} If the deletion fails
+   */
+  async deleteMapping(mappingId: string): Promise<void> {
+    await this.client.delete(`/api/v1/mappings/${mappingId}`);
+  }
+
+  /**
+   * Validate a mapping against a sample record
+   *
+   * @param request - Validation request with mapping and sample record
+   * @returns Validation result with matched/unmapped/missing fields
+   * @throws {ApiClientError} If the validation request fails
+   */
+  async validateMapping(request: MappingValidationRequest): Promise<MappingValidationResult> {
+    const response = await this.client.post<MappingValidationResult>(
+      '/api/v1/mappings/validate',
+      request,
+    );
+    return response.data;
+  }
+
+  /**
+   * Preview the effect of a mapping on a sample record
+   *
+   * @param fields - Field mapping entries to preview
+   * @param sampleRecord - Sample data record to transform
+   * @returns Preview entries showing original and transformed values
+   * @throws {ApiClientError} If the preview request fails
+   */
+  async previewMapping(
+    fields: Record<string, FieldMappingEntry>,
+    sampleRecord: Record<string, string>,
+  ): Promise<FieldPreviewResponse> {
+    const response = await this.client.post<FieldPreviewResponse>(
+      '/api/v1/mappings/preview',
+      { fields, sample_record: sampleRecord },
+    );
+    return response.data;
+  }
+
+  /**
+   * Fetch a sample record from a data source for mapping configuration
+   *
+   * @param source - Path or identifier of the data source
+   * @param fileFormat - Optional file format hint
+   * @returns Sample record with field names and values
+   * @throws {ApiClientError} If the sample record cannot be fetched
+   */
+  async getSampleRecord(source: string, fileFormat?: string): Promise<SampleRecordResponse> {
+    const body: Record<string, string> = { source };
+    if (fileFormat) {
+      body.file_format = fileFormat;
+    }
+    const response = await this.client.post<SampleRecordResponse>(
+      '/api/v1/mappings/sample',
+      body,
+    );
+    return response.data;
+  }
+
+  /**
+   * Load a mapping configuration from a YAML file on disk
+   */
+  async loadMappingYaml(path: string): Promise<MappingConfigResponse> {
+    const response = await this.client.post<MappingConfigResponse>(
+      '/api/v1/mappings/load-yaml',
+      { path },
+    );
+    return response.data;
+  }
+
+  /**
+   * Start a sanitization run
+   */
+  async sanitize(request: SanitizeRequest): Promise<SanitizeResponse> {
+    const response = await this.client.post<SanitizeResponse>(
+      '/api/v1/scans/sanitize',
+      request,
     );
     return response.data;
   }

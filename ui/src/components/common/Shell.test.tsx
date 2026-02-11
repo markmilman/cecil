@@ -84,15 +84,23 @@ describe('Shell', () => {
     const onNavigate = vi.fn();
     renderShell({ onNavigate });
 
-    fireEvent.click(screen.getByText('Mapping Rules'));
+    fireEvent.click(screen.getByText('Settings'));
     expect(onNavigate).not.toHaveBeenCalled();
   });
 
   it('shows "Coming soon" tooltip on disabled nav links', () => {
     renderShell();
-    const mappingLink = screen.getByText('Mapping Rules');
-    expect(mappingLink).toHaveAttribute('title', 'Coming soon');
-    expect(mappingLink).toBeDisabled();
+    const settingsLink = screen.getByText('Settings');
+    expect(settingsLink).toHaveAttribute('title', 'Coming soon');
+    expect(settingsLink).toBeDisabled();
+  });
+
+  it('calls onNavigate when Mapping Rules is clicked', () => {
+    const onNavigate = vi.fn();
+    renderShell({ onNavigate, activeView: 'dashboard' });
+
+    fireEvent.click(screen.getByText('Mapping Rules'));
+    expect(onNavigate).toHaveBeenCalledWith('mapping');
   });
 
   it('renders the theme toggle button', () => {

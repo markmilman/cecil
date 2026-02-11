@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from cecil.api.routes.filesystem import router as filesystem_router
+from cecil.api.routes.mappings import router as mappings_router
 from cecil.api.routes.scans import router as scans_router
 from cecil.api.schemas import ErrorResponse, HealthResponse
 from cecil.utils.errors import ServerStartupError
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
         return HealthResponse(status="ok", version=_CECIL_VERSION)
 
     application.include_router(filesystem_router)
+    application.include_router(mappings_router)
     application.include_router(scans_router)
 
     # Serve the built React UI.  Static assets (JS, CSS, images) are

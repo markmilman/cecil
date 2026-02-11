@@ -6,12 +6,12 @@
  * Top-level views rendered in the main content area.
  * The app uses state-driven view switching rather than a router.
  */
-export type ActiveView = 'dashboard' | 'wizard';
+export type ActiveView = 'dashboard' | 'wizard' | 'mapping';
 
 /**
  * Steps within the ingestion wizard flow.
  */
-export type WizardStep = 1 | 2 | 3 | 4;
+export type WizardStep = 1 | 2 | 3 | 4 | 5;
 
 /**
  * Navigation route definition
@@ -128,4 +128,112 @@ export interface ScanProgress {
   percent_complete: number | null;
   elapsed_seconds: number;
   error_type: string | null;
+}
+
+/**
+ * Available redaction actions for field-level sanitization
+ */
+export enum RedactionAction {
+  REDACT = "redact",
+  MASK = "mask",
+  HASH = "hash",
+  KEEP = "keep",
+}
+
+/**
+ * A single field's mapping configuration
+ */
+export interface FieldMappingEntry {
+  action: RedactionAction;
+  options: Record<string, string>;
+}
+
+/**
+ * Request payload for creating or updating a mapping configuration
+ */
+export interface MappingConfigRequest {
+  version: number;
+  default_action: RedactionAction;
+  fields: Record<string, FieldMappingEntry>;
+}
+
+/**
+ * Response payload for a mapping configuration
+ */
+export interface MappingConfigResponse {
+  mapping_id: string;
+  version: number;
+  default_action: RedactionAction;
+  fields: Record<string, FieldMappingEntry>;
+  policy_hash: string;
+  created_at: string;
+}
+
+/**
+ * Request payload for validating a mapping against a sample record
+ */
+export interface MappingValidationRequest {
+  mapping: MappingConfigRequest;
+  sample_record: Record<string, string>;
+}
+
+/**
+ * Result of mapping validation
+ */
+export interface MappingValidationResult {
+  is_valid: boolean;
+  matched_fields: string[];
+  unmapped_fields: string[];
+  missing_fields: string[];
+}
+
+/**
+ * A single field's preview showing original and transformed values
+ */
+export interface FieldPreviewEntry {
+  field_name: string;
+  original: string;
+  transformed: string;
+  action: RedactionAction;
+}
+
+/**
+ * Response payload for a mapping preview
+ */
+export interface FieldPreviewResponse {
+  entries: FieldPreviewEntry[];
+}
+
+/**
+ * Response payload for fetching a sample record from a data source
+ */
+export interface SampleRecordResponse {
+  record: Record<string, string>;
+  field_count: number;
+  source: string;
+}
+
+/**
+ * Request payload for initiating a sanitization run
+ */
+export interface SanitizeRequest {
+  source: string;
+  mapping_id?: string | null;
+  mapping_yaml_path?: string | null;
+  output_dir: string;
+  output_format?: string;
+}
+
+/**
+ * Response payload for a sanitization run
+ */
+export interface SanitizeResponse {
+  scan_id: string;
+  status: ScanStatus;
+  source: string;
+  output_path: string;
+  records_processed: number;
+  records_sanitized: number;
+  records_failed: number;
+  created_at: string;
 }

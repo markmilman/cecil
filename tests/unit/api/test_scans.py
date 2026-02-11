@@ -360,3 +360,209 @@ def _clear_scan_store() -> Generator[None, None, None]:
     _scan_store.clear()
     yield
     _scan_store.clear()
+
+
+@pytest.fixture(autouse=True)
+def _clear_mapping_store() -> Generator[None, None, None]:
+    """Clear the in-memory mapping store between tests."""
+    from cecil.api.routes.mappings import _mapping_store
+
+    _mapping_store.clear()
+    yield
+    _mapping_store.clear()
+
+
+def _create_mapping_yaml(tmp_path: Path) -> Path:
+    """Create a temporary mapping YAML file.
+
+    Args:
+        tmp_path: Pytest temporary directory.
+
+    Returns:
+        Path to the created YAML file.
+    """
+    f = tmp_path / "mapping.yaml"
+    f.write_text(
+        "version: 1\n"
+        "default_action: redact\n"
+        "fields:\n"
+        "  id:\n"
+        "    action: keep\n"
+        "  data:\n"
+        "    action: redact\n",
+    )
+    return f
+
+
+class TestSanitize:
+    """Tests for POST /api/v1/scans/sanitize endpoint."""
+
+    def test_sanitize_valid_with_mapping_id_returns_201(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A valid sanitize request with mapping_id returns 201."""
+        # Create a mapping first.
+        mapping_resp = client.post(
+            "/api/v1/mappings/",
+            json={
+                "version": 1,
+                "default_action": "redact",
+                "fields": {
+                    "id": {"action": "keep", "options": {}},
+                    "data": {"action": "redact", "options": {}},
+                },
+            },
+        )
+        mapping_id = mapping_resp.json()["mapping_id"]
+
+        jsonl_file = _create_jsonl_file(tmp_path)
+        output_dir = tmp_path / "output"
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_id": mapping_id,
+                "output_dir": str(output_dir),
+            },
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert "scan_id" in body
+        assert body["status"] in ("pending", "completed")
+        assert body["output_path"].endswith("_sanitized.jsonl")
+
+    def test_sanitize_valid_with_yaml_path_returns_201(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A valid sanitize request with mapping_yaml_path returns 201."""
+        jsonl_file = _create_jsonl_file(tmp_path)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "output"
+
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert "scan_id" in body
+        assert body["output_path"].endswith("_sanitized.jsonl")
+
+    def test_sanitize_nonexistent_source_returns_404(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A nonexistent source file returns 404."""
+        yaml_file = _create_mapping_yaml(tmp_path)
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": "/nonexistent/path.jsonl",
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(tmp_path / "output"),
+            },
+        )
+
+        assert response.status_code == 404
+        assert response.json()["error"] == "file_not_found"
+
+    def test_sanitize_missing_mapping_returns_422(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A request without mapping_id or mapping_yaml_path returns 422."""
+        jsonl_file = _create_jsonl_file(tmp_path)
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "output_dir": str(tmp_path / "output"),
+            },
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"] == "missing_mapping"
+
+    def test_sanitize_nonexistent_mapping_id_returns_404(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A nonexistent mapping_id returns 404."""
+        jsonl_file = _create_jsonl_file(tmp_path)
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_id": "nonexistent-id",
+                "output_dir": str(tmp_path / "output"),
+            },
+        )
+
+        assert response.status_code == 404
+        assert response.json()["error"] == "mapping_not_found"
+
+    def test_sanitize_path_traversal_returns_403(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A path containing '..' components returns 403."""
+        yaml_file = _create_mapping_yaml(tmp_path)
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": "../../etc/passwd",
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(tmp_path / "output"),
+            },
+        )
+
+        assert response.status_code == 403
+        assert response.json()["error"] == "path_traversal"
+
+    def test_sanitize_produces_output_file(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Sanitization produces an output file with sanitized content.
+
+        TestClient runs background tasks synchronously, so the output
+        file should exist after the POST returns.
+        """
+        jsonl_file = _create_jsonl_file(tmp_path, records=2)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "output"
+
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+
+        assert response.status_code == 201
+        output_path = Path(response.json()["output_path"])
+        assert output_path.is_file()
+
+        lines = output_path.read_text(encoding="utf-8").strip().split("\n")
+        assert len(lines) == 2
+        record = json.loads(lines[0])
+        # 'id' is KEEP, should be unchanged; 'data' is REDACT, should be replaced.
+        assert record["id"] == 0
+        assert "REDACTED" in record["data"]

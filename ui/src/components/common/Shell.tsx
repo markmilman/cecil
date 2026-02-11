@@ -22,7 +22,7 @@ interface NavLinkItem {
 
 const NAV_LINKS: NavLinkItem[] = [
   { view: 'dashboard', label: 'Dashboard', enabled: true },
-  { view: 'mapping', label: 'Mapping Rules', enabled: false },
+  { view: 'mapping', label: 'Mapping Rules', enabled: true },
   { view: 'settings', label: 'Settings', enabled: false },
 ];
 

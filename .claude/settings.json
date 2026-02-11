@@ -3,5 +3,11 @@
     "allow": [
       "Bash(gh auth status:*)"
     ]
-  }
+  },
+  "experimental": {
+       "agentTeams": {
+         "enabled": true,
+         "display": "split-panes"
+       }
+     }
 }

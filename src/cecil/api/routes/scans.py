@@ -21,12 +21,19 @@ from fastapi.responses import JSONResponse
 from cecil.api.schemas import (
     ErrorResponse,
     FileFormat,
+    SanitizeRequest,
+    SanitizeResponse,
     ScanProgress,
     ScanRequest,
     ScanResponse,
     ScanStatus,
 )
+from cecil.core.output.writer import JsonlWriter
 from cecil.core.providers.registry import get_provider
+from cecil.core.sanitizer.engine import SanitizationEngine
+from cecil.core.sanitizer.mapping import MappingParser
+from cecil.core.sanitizer.models import MappingConfig
+from cecil.core.sanitizer.strategies import StrictStrategy
 from cecil.utils.errors import CecilError
 
 
@@ -58,6 +65,9 @@ class ScanState:
     records_processed: int = 0
     records_redacted: int = 0
     errors: list[str] = field(default_factory=list)
+    output_path: str | None = None
+    records_sanitized: int = 0
+    records_failed: int = 0
 
 
 # In-memory scan store keyed by scan_id.
@@ -243,6 +253,189 @@ async def create_scan(
     )
 
     return _scan_state_to_response(state)
+
+
+def _execute_sanitize(
+    scan_id: str,
+    source: str,
+    file_format: FileFormat,
+    mapping_config: MappingConfig,
+    output_path: str,
+) -> None:
+    """Execute sanitization as a background task.
+
+    Connects to the provider, streams records through the sanitization
+    engine, and writes sanitized output to the JSONL writer.
+
+    Args:
+        scan_id: The unique scan identifier.
+        source: The file path to sanitize.
+        file_format: The resolved file format.
+        mapping_config: The mapping configuration for the strategy.
+        output_path: The output file path.
+    """
+    state = _scan_store[scan_id]
+    state.status = ScanStatus.RUNNING
+
+    provider = get_provider("local_file", file_path=source, format_hint=file_format.value)
+    strategy = StrictStrategy(config=mapping_config)
+    engine = SanitizationEngine(strategy)
+    writer = JsonlWriter(Path(output_path))
+
+    try:
+        provider.connect()
+        for sanitized_record in engine.process_stream(provider.stream_records()):
+            writer.write_record(sanitized_record.data)
+            state.records_processed = engine.records_processed
+            state.records_sanitized = engine.records_sanitized
+            state.records_failed = engine.records_failed
+
+        state.status = ScanStatus.COMPLETED
+        state.records_processed = engine.records_processed
+        state.records_sanitized = engine.records_sanitized
+        state.records_failed = engine.records_failed
+    except CecilError as err:
+        state.status = ScanStatus.FAILED
+        state.errors.append(type(err).__name__)
+    except Exception as err:
+        state.status = ScanStatus.FAILED
+        state.errors.append(type(err).__name__)
+    finally:
+        writer.close()
+        provider.close()
+
+
+@router.post(
+    "/sanitize",
+    response_model=SanitizeResponse,
+    status_code=201,
+    responses={
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+async def sanitize(
+    request: SanitizeRequest,
+    background_tasks: BackgroundTasks,
+) -> SanitizeResponse | JSONResponse:
+    """Initiate a sanitization run with a mapping configuration.
+
+    Validates the source path, resolves the mapping, and queues
+    a background task to sanitize records through the engine.
+
+    Args:
+        request: The sanitize request payload.
+        background_tasks: FastAPI background task manager.
+
+    Returns:
+        A SanitizeResponse with the new scan's metadata, or a
+        JSONResponse with an error payload for validation failures.
+    """
+    # Path traversal check.
+    if ".." in Path(request.source).parts:
+        return JSONResponse(
+            status_code=403,
+            content=ErrorResponse(
+                error="path_traversal",
+                message="Path traversal is not allowed",
+            ).model_dump(),
+        )
+
+    # Validate source file.
+    resolved = Path(request.source).resolve()
+    if not resolved.is_file():
+        return JSONResponse(
+            status_code=404,
+            content=ErrorResponse(
+                error="file_not_found",
+                message="Source file does not exist",
+            ).model_dump(),
+        )
+
+    # Resolve mapping.
+    mapping_config: MappingConfig | None = None
+    if request.mapping_id:
+        from cecil.api.routes.mappings import _mapping_store
+
+        mapping_state = _mapping_store.get(request.mapping_id)
+        if mapping_state is None:
+            return JSONResponse(
+                status_code=404,
+                content=ErrorResponse(
+                    error="mapping_not_found",
+                    message="No mapping found with the given ID",
+                ).model_dump(),
+            )
+        mapping_config = mapping_state.config
+    elif request.mapping_yaml_path:
+        try:
+            mapping_config = MappingParser().parse_file(request.mapping_yaml_path)
+        except CecilError as err:
+            return JSONResponse(
+                status_code=422,
+                content=ErrorResponse(
+                    error="mapping_error",
+                    message=str(err),
+                ).model_dump(),
+            )
+    else:
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="missing_mapping",
+                message="Either mapping_id or mapping_yaml_path is required",
+            ).model_dump(),
+        )
+
+    # Resolve file format.
+    suffix = resolved.suffix.lower()
+    detected = _EXTENSION_FORMAT_MAP.get(suffix)
+    if detected is None:
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="unsupported_format",
+                message="File format not supported",
+            ).model_dump(),
+        )
+
+    # Build output path.
+    output_dir = Path(request.output_dir)
+    output_path = output_dir / f"{resolved.stem}_sanitized.jsonl"
+
+    # Create scan state.
+    scan_id = str(uuid4())
+    state = ScanState(
+        scan_id=scan_id,
+        status=ScanStatus.PENDING,
+        source=str(resolved),
+        file_format=detected,
+        created_at=datetime.now(tz=UTC),
+        output_path=str(output_path),
+    )
+    _scan_store[scan_id] = state
+
+    # Queue background task.
+    background_tasks.add_task(
+        _execute_sanitize,
+        scan_id,
+        str(resolved),
+        detected,
+        mapping_config,
+        str(output_path),
+    )
+
+    return SanitizeResponse(
+        scan_id=scan_id,
+        status=state.status,
+        source=str(resolved),
+        output_path=str(output_path),
+        records_processed=0,
+        records_sanitized=0,
+        records_failed=0,
+        created_at=state.created_at,
+    )
 
 
 @router.get(

@@ -144,7 +144,7 @@ export function QueuedFiles({
             onClick={onSanitize}
             disabled={files.length === 0}
           >
-            Sanitize {files.length} File{files.length !== 1 ? 's' : ''}
+            Next: Configure Mapping
           </button>
         </div>
       </div>

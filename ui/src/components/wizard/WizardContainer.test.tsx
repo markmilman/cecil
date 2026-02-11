@@ -7,6 +7,8 @@ import { FileFormat } from '@/types';
 vi.mock('@/lib/apiClient', () => ({
   apiClient: {
     uploadFiles: vi.fn(),
+    loadMappingYaml: vi.fn(),
+    sanitize: vi.fn(),
   },
 }));
 
@@ -84,7 +86,7 @@ describe('WizardContainer', () => {
     expect(screen.getByText('File Ingestion')).toBeInTheDocument();
   });
 
-  it('advances to step 3 when Sanitize button is clicked', async () => {
+  it('advances to step 3 (MappingConfigStep) when Next button is clicked', async () => {
     vi.useRealTimers();
     render(<WizardContainer onBackToDashboard={vi.fn()} />);
 
@@ -94,13 +96,13 @@ describe('WizardContainer', () => {
     fireEvent.change(fileInput);
 
     await waitFor(() => {
-      expect(screen.getByText('Sanitize 2 Files')).toBeInTheDocument();
+      expect(screen.getByText('Next: Configure Mapping')).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByText('Sanitize 2 Files'));
-    expect(screen.getByText('Sanitizing Files...')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Next: Configure Mapping'));
+    expect(screen.getByText('Configure Mapping')).toBeInTheDocument();
   });
 
-  it('goes back to step 2 when Stop Process is clicked in step 3', async () => {
+  it('goes back to step 2 when Back is clicked in step 3', async () => {
     vi.useRealTimers();
     render(<WizardContainer onBackToDashboard={vi.fn()} />);
 
@@ -110,10 +112,12 @@ describe('WizardContainer', () => {
     fireEvent.change(fileInput);
 
     await waitFor(() => {
-      expect(screen.getByText('Sanitize 2 Files')).toBeInTheDocument();
+      expect(screen.getByText('Next: Configure Mapping')).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByText('Sanitize 2 Files'));
-    fireEvent.click(screen.getByText('Stop Process'));
+    fireEvent.click(screen.getByText('Next: Configure Mapping'));
+    expect(screen.getByText('Configure Mapping')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Back'));
     expect(screen.getByText('Queued Files')).toBeInTheDocument();
   });
 });

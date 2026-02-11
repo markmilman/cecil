@@ -4,6 +4,7 @@ import { Shell } from '@/components/common/Shell';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { WizardContainer } from '@/components/wizard/WizardContainer';
+import { MappingPage } from '@/pages/MappingPage';
 
 import type { ActiveView } from '@/types';
 
@@ -16,9 +17,11 @@ import type { ActiveView } from '@/types';
  */
 export function App() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+  const [mappingSource, setMappingSource] = useState<string | null>(null);
+  const [wizardMappingId, setWizardMappingId] = useState<string | null>(null);
 
   const handleNavigate = useCallback((view: string) => {
-    if (view === 'dashboard' || view === 'wizard') {
+    if (view === 'dashboard' || view === 'wizard' || view === 'mapping') {
       setActiveView(view);
     }
   }, []);
@@ -29,6 +32,20 @@ export function App() {
 
   const handleBackToDashboard = useCallback(() => {
     setActiveView('dashboard');
+  }, []);
+
+  const handleConfigureMapping = useCallback((source: string) => {
+    setMappingSource(source);
+    setActiveView('mapping');
+  }, []);
+
+  const handleMappingComplete = useCallback((mappingId: string) => {
+    setWizardMappingId(mappingId);
+    setActiveView('wizard');
+  }, []);
+
+  const handleClearWizardMappingId = useCallback(() => {
+    setWizardMappingId(null);
   }, []);
 
   return (
@@ -49,7 +66,20 @@ export function App() {
               <DashboardPage onStartWizard={handleStartWizard} />
             )}
             {activeView === 'wizard' && (
-              <WizardContainer onBackToDashboard={handleBackToDashboard} />
+              <WizardContainer
+                onBackToDashboard={handleBackToDashboard}
+                onConfigureMapping={handleConfigureMapping}
+                initialMappingId={wizardMappingId}
+                onClearInitialMappingId={handleClearWizardMappingId}
+              />
+            )}
+            {activeView === 'mapping' && (
+              <MappingPage
+                source={mappingSource}
+                onStartWizard={handleStartWizard}
+                onBackToDashboard={handleBackToDashboard}
+                onMappingComplete={handleMappingComplete}
+              />
             )}
           </ErrorBoundary>
         </div>
