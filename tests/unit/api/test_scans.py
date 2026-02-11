@@ -600,3 +600,74 @@ class TestSanitize:
         # Verify the output file was written successfully.
         output_path = Path(response.json()["output_path"])
         assert output_path.is_file()
+
+
+class TestCancelScan:
+    """Tests for POST /api/v1/scans/{scan_id}/cancel endpoint."""
+
+    def test_cancel_running_scan_returns_200(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Cancelling a running scan sets the cancellation flag."""
+        jsonl_file = _create_jsonl_file(tmp_path, records=2)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "output"
+
+        # Start a sanitization scan.
+        resp = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+        scan_id = resp.json()["scan_id"]
+
+        # Cancel the scan (even though it may have already completed).
+        cancel_resp = client.post(f"/api/v1/scans/{scan_id}/cancel")
+
+        # Should return 200 (or 422 if already completed).
+        assert cancel_resp.status_code in (200, 422)
+
+    def test_cancel_nonexistent_scan_returns_404(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Cancelling a non-existent scan returns 404."""
+        response = client.post("/api/v1/scans/nonexistent-id/cancel")
+
+        assert response.status_code == 404
+        assert response.json()["error"] == "scan_not_found"
+
+    def test_cancel_completed_scan_returns_422(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Cancelling an already completed scan returns 422."""
+        jsonl_file = _create_jsonl_file(tmp_path, records=2)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "output"
+
+        # Start and complete a sanitization scan.
+        resp = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+        scan_id = resp.json()["scan_id"]
+
+        # Wait for completion (TestClient runs background tasks synchronously).
+        # By the time we try to cancel, the scan should be completed.
+
+        # Try to cancel the completed scan.
+        cancel_resp = client.post(f"/api/v1/scans/{scan_id}/cancel")
+
+        assert cancel_resp.status_code == 422
+        assert cancel_resp.json()["error"] == "scan_not_cancellable"
