@@ -58,6 +58,20 @@ export function ProcessingView({
     }
   }, []);
 
+  const handleStop = useCallback(async () => {
+    if (scanIdRef.current) {
+      try {
+        await apiClient.cancelScan(scanIdRef.current);
+        setLogLines((prev) => [...prev, '> Cancellation requested...']);
+      } catch (err) {
+        // Log error but still allow navigation back
+        console.error('Failed to cancel scan:', err);
+      }
+    }
+    cleanup();
+    onStop();
+  }, [cleanup, onStop]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -166,7 +180,7 @@ export function ProcessingView({
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={onStop}
+              onClick={handleStop}
             >
               Back
             </button>
@@ -203,7 +217,7 @@ export function ProcessingView({
           <button
             type="button"
             className="btn btn-danger"
-            onClick={onStop}
+            onClick={handleStop}
           >
             Stop Process
           </button>
