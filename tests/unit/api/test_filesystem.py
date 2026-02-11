@@ -393,3 +393,118 @@ class TestSymlinks:
         all_names = [e["name"] for e in data["directories"] + data["files"]]
         assert "broken_link" not in all_names
         assert "valid.jsonl" in all_names
+
+
+class TestOpenDirectory:
+    """Tests for the POST /api/v1/filesystem/open-directory endpoint."""
+
+    def test_open_directory_valid_path_returns_success(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Opening a valid directory returns success=true."""
+        # Mock subprocess.run to avoid actually opening a file manager.
+        calls = []
+
+        def mock_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append(cmd)
+            return type("CompletedProcess", (), {"returncode": 0})()
+
+        monkeypatch.setattr("subprocess.run", mock_run)
+
+        resp = client.post(
+            "/api/v1/filesystem/open-directory",
+            json={"path": str(tmp_path)},
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert "successfully" in data["message"].lower()
+        # Verify that subprocess.run was called with the correct command.
+        assert len(calls) == 1
+        assert str(tmp_path) in calls[0]
+
+    def test_open_directory_nonexistent_path_returns_404(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Opening a non-existent directory returns 404."""
+        resp = client.post(
+            "/api/v1/filesystem/open-directory",
+            json={"path": "/nonexistent/path"},
+        )
+
+        assert resp.status_code == 404
+        data = resp.json()
+        assert data["error"] == "directory_not_found"
+
+    def test_open_directory_file_instead_of_directory_returns_422(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Opening a file path (not directory) returns 422."""
+        file_path = tmp_path / "data.jsonl"
+        file_path.write_text('{"a":1}\n')
+
+        resp = client.post(
+            "/api/v1/filesystem/open-directory",
+            json={"path": str(file_path)},
+        )
+
+        assert resp.status_code == 422
+        data = resp.json()
+        assert data["error"] == "not_a_directory"
+
+    def test_open_directory_path_traversal_returns_403(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Paths containing .. are rejected with 403."""
+        resp = client.post(
+            "/api/v1/filesystem/open-directory",
+            json={"path": "/tmp/../etc"},  # noqa: S108
+        )
+
+        assert resp.status_code == 403
+        data = resp.json()
+        assert data["error"] == "path_traversal"
+
+    def test_open_directory_empty_path_returns_422(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Empty path string returns 422 from Pydantic validation."""
+        resp = client.post(
+            "/api/v1/filesystem/open-directory",
+            json={"path": ""},
+        )
+
+        assert resp.status_code == 422
+
+    def test_open_directory_subprocess_error_returns_success_false(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """If subprocess.run fails, returns success=false with error message."""
+        import subprocess
+
+        def mock_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
+            raise subprocess.CalledProcessError(1, cmd, stderr=b"error")
+
+        monkeypatch.setattr("subprocess.run", mock_run)
+
+        resp = client.post(
+            "/api/v1/filesystem/open-directory",
+            json={"path": str(tmp_path)},
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is False
+        assert "Failed to open directory" in data["message"]

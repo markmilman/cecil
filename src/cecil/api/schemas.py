@@ -170,6 +170,30 @@ class UploadResponse(BaseModel):
     )
 
 
+class OpenDirectoryRequest(BaseModel):
+    """Request payload for opening a directory in the system file manager."""
+
+    path: str = Field(description="Absolute path to the directory to open")
+
+    @field_validator("path")
+    @classmethod
+    def validate_path_non_empty(cls, v: str) -> str:
+        """Validate that path is not an empty string."""
+        if not v or not v.strip():
+            raise ValueError("path must be a non-empty string")
+        return v
+
+
+class OpenDirectoryResponse(BaseModel):
+    """Response from the open-directory endpoint."""
+
+    success: bool = Field(description="Whether the directory was opened successfully")
+    message: str | None = Field(
+        default=None,
+        description="Human-readable message (error details if success=false)",
+    )
+
+
 class ScanProgress(BaseModel):
     """Real-time progress information for an active scan."""
 

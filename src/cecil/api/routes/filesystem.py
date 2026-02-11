@@ -10,16 +10,22 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
+import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Query, UploadFile
+from fastapi.responses import JSONResponse
 
 from cecil.api.schemas import (
     BrowseResponse,
+    ErrorResponse,
     FileFormat,
     FilesystemEntry,
+    OpenDirectoryRequest,
+    OpenDirectoryResponse,
     UploadedFileInfo,
     UploadResponse,
 )
@@ -333,3 +339,113 @@ async def upload_files(
         )
 
     return UploadResponse(files=uploaded, errors=errors)
+
+
+@router.post(
+    "/open-directory",
+    response_model=OpenDirectoryResponse,
+    responses={
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+async def open_directory(
+    request: OpenDirectoryRequest,
+) -> OpenDirectoryResponse | JSONResponse:
+    """Open a directory in the system file manager.
+
+    Uses platform-specific commands to open the directory:
+    - macOS: `open`
+    - Windows: `explorer`
+    - Linux: `xdg-open`
+
+    Args:
+        request: The open directory request with the path.
+
+    Returns:
+        An OpenDirectoryResponse indicating success or failure,
+        or a JSONResponse with an error payload for validation failures.
+    """
+    # Path traversal check.
+    if ".." in Path(request.path).parts:
+        logger.warning(
+            "Path traversal attempt blocked in open-directory",
+            extra={"path_parts_count": len(Path(request.path).parts)},
+        )
+        return JSONResponse(
+            status_code=403,
+            content=ErrorResponse(
+                error="path_traversal",
+                message="Path traversal is not allowed",
+            ).model_dump(),
+        )
+
+    # Resolve and validate directory existence.
+    try:
+        resolved = Path(request.path).resolve(strict=True)
+    except OSError:
+        return JSONResponse(
+            status_code=404,
+            content=ErrorResponse(
+                error="directory_not_found",
+                message="Directory does not exist or is not accessible",
+            ).model_dump(),
+        )
+
+    if not resolved.is_dir():
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="not_a_directory",
+                message="Path is not a directory",
+            ).model_dump(),
+        )
+
+    # Determine platform-specific command.
+    if sys.platform == "darwin":
+        cmd = ["open", str(resolved)]
+    elif sys.platform == "win32":
+        cmd = ["explorer", str(resolved)]
+    else:
+        # Linux and other Unix-like systems.
+        cmd = ["xdg-open", str(resolved)]
+
+    # Execute the command to open the directory.
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=5)  # noqa: S603
+        logger.info(
+            "Directory opened in file manager",
+            extra={"platform": sys.platform},
+        )
+        return OpenDirectoryResponse(
+            success=True,
+            message="Directory opened successfully",
+        )
+    except subprocess.CalledProcessError as err:
+        logger.warning(
+            "Failed to open directory",
+            extra={"platform": sys.platform, "returncode": err.returncode},
+        )
+        return OpenDirectoryResponse(
+            success=False,
+            message=f"Failed to open directory: {err}",
+        )
+    except subprocess.TimeoutExpired:
+        logger.warning(
+            "Timeout opening directory",
+            extra={"platform": sys.platform},
+        )
+        return OpenDirectoryResponse(
+            success=False,
+            message="Timeout opening directory",
+        )
+    except FileNotFoundError:
+        logger.warning(
+            "File manager command not found",
+            extra={"platform": sys.platform, "command": cmd[0]},
+        )
+        return OpenDirectoryResponse(
+            success=False,
+            message=f"File manager not available: {cmd[0]} not found",
+        )
