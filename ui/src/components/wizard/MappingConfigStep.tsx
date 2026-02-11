@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { FileTextIcon, PlusCircleIcon, FolderIcon, AlertCircleIcon, CheckCircleIcon } from 'lucide-react';
 import { WizardHeader } from './WizardHeader';
 import { apiClient } from '@/lib/apiClient';
+import { useMappingList } from '@/hooks/useMappingList';
 import type { UploadedFileInfo, MappingConfigResponse } from '@/types';
 
 interface MappingConfigStepProps {
@@ -35,6 +36,14 @@ export function MappingConfigStep({
   const [successMessage, setSuccessMessage] = useState<string | null>(
     initialMappingId ? 'Mapping loaded from editor.' : null,
   );
+
+  const { mappings, isLoading: isLoadingMappings, error: mappingsError } = useMappingList();
+
+  const handleUseSavedMapping = useCallback((mapping: MappingConfigResponse) => {
+    setMappingId(mapping.mapping_id);
+    setError(null);
+    setSuccessMessage(`Mapping loaded: ${mapping.mapping_id} (${mapping.field_count} fields)`);
+  }, []);
 
   const handleLoadYaml = useCallback(async () => {
     if (!yamlPath.trim()) return;
@@ -153,31 +162,121 @@ export function MappingConfigStep({
                 Load Existing Mapping
               </h3>
             </div>
-            <div className="flex" style={{ gap: '8px', marginBottom: '8px' }}>
-              <input
-                type="text"
-                value={yamlPath}
-                onChange={(e) => setYamlPath(e.target.value)}
-                placeholder="/path/to/mapping.yaml"
+
+            {/* Show error if mappings failed to load */}
+            {mappingsError && (
+              <div
                 style={{
-                  flex: 1,
                   padding: '8px 12px',
-                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--danger-bg)',
+                  border: '1px solid var(--danger-border)',
                   borderRadius: '6px',
-                  fontSize: '14px',
-                  color: 'var(--text-primary)',
-                  backgroundColor: 'var(--bg-card, white)',
+                  marginBottom: '12px',
+                  fontSize: '13px',
+                  color: 'var(--danger-color)',
                 }}
-              />
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleLoadYaml}
-                disabled={isLoading || !yamlPath.trim()}
-                style={{ padding: '8px 16px', fontSize: '14px' }}
               >
-                {isLoading ? 'Loading...' : 'Load'}
-              </button>
+                {mappingsError}
+              </div>
+            )}
+
+            {/* Saved Mappings Selector */}
+            {!mappingsError && mappings.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <p
+                  style={{
+                    margin: '0 0 8px',
+                    fontSize: '13px',
+                    color: 'var(--text-secondary)',
+                    fontWeight: 500,
+                  }}
+                >
+                  Select a saved mapping:
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                  {mappings.map((mapping) => (
+                    <div
+                      key={mapping.mapping_id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        backgroundColor: 'var(--bg-card, white)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                      }}
+                    >
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            fontWeight: 500,
+                            color: 'var(--text-primary)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title={mapping.mapping_id}
+                        >
+                          {mapping.mapping_id}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                          {mapping.field_count} fields • {mapping.default_action}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => handleUseSavedMapping(mapping)}
+                        style={{ padding: '4px 12px', fontSize: '12px', marginLeft: '8px' }}
+                      >
+                        Use This
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Manual YAML Path Input */}
+            <div>
+              <p
+                style={{
+                  margin: '0 0 8px',
+                  fontSize: '13px',
+                  color: 'var(--text-secondary)',
+                  fontWeight: 500,
+                }}
+              >
+                {mappings.length > 0 ? 'Or load from file:' : 'Load from file:'}
+              </p>
+              <div className="flex" style={{ gap: '8px' }}>
+                <input
+                  type="text"
+                  value={yamlPath}
+                  onChange={(e) => setYamlPath(e.target.value)}
+                  placeholder="/path/to/mapping.yaml"
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    color: 'var(--text-primary)',
+                    backgroundColor: 'var(--bg-card, white)',
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleLoadYaml}
+                  disabled={isLoading || !yamlPath.trim()}
+                  style={{ padding: '8px 16px', fontSize: '14px' }}
+                >
+                  {isLoading ? 'Loading...' : 'Load'}
+                </button>
+              </div>
             </div>
           </div>
 

@@ -116,14 +116,32 @@ export function SavedMappingsList({ onViewMapping }: SavedMappingsListProps) {
               <div
                 style={{
                   display: 'flex',
-                  gap: '16px',
+                  flexDirection: 'column',
+                  gap: '4px',
                   fontSize: '14px',
                   color: 'var(--text-secondary)',
                 }}
               >
-                <span>{Object.keys(mapping.fields).length} field{Object.keys(mapping.fields).length !== 1 ? 's' : ''}</span>
-                <span>Default: {mapping.default_action}</span>
-                <span>{new Date(mapping.created_at).toLocaleDateString()}</span>
+                <div style={{ display: 'flex', gap: '16px' }}>
+                  <span>{Object.keys(mapping.fields).length} field{Object.keys(mapping.fields).length !== 1 ? 's' : ''}</span>
+                  <span>Default: {mapping.default_action}</span>
+                  <span>{new Date(mapping.created_at).toLocaleDateString()}</span>
+                </div>
+                {mapping.yaml_path && (
+                  <div
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '12px',
+                      color: 'var(--text-secondary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={mapping.yaml_path}
+                  >
+                    {mapping.yaml_path}
+                  </div>
+                )}
               </div>
             </div>
 

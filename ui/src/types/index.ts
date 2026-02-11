@@ -166,7 +166,9 @@ export interface MappingConfigResponse {
   default_action: RedactionAction;
   fields: Record<string, FieldMappingEntry>;
   policy_hash: string;
+  field_count: number;
   created_at: string;
+  yaml_path?: string | null;
 }
 
 /**
