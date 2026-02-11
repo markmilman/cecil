@@ -9,6 +9,7 @@ import argparse
 import logging
 import sys
 
+from cecil.cli.app import register_app_parser
 from cecil.cli.scan import register_scan_parser
 
 
@@ -35,6 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     subparsers = parser.add_subparsers(dest="command")
+    register_app_parser(subparsers)
     register_scan_parser(subparsers)
 
     return parser
