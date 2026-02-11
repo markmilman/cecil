@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import yaml
 from fastapi import APIRouter, Response
 from fastapi.responses import JSONResponse
 
@@ -59,15 +60,141 @@ class MappingState:
         mapping_id: Unique identifier for the mapping.
         config: The validated domain MappingConfig.
         created_at: Timestamp when the mapping was created.
+        yaml_path: Path to the persisted YAML file on disk (if saved).
     """
 
     mapping_id: str
     config: MappingConfig
     created_at: datetime
+    yaml_path: str | None = None
 
 
 # In-memory mapping store keyed by mapping_id.
 _mapping_store: dict[str, MappingState] = {}
+
+
+def _mapping_config_to_dict(config: MappingConfig) -> dict[str, Any]:
+    """Serialize a MappingConfig to a YAML-safe dictionary.
+
+    Args:
+        config: The domain MappingConfig to serialize.
+
+    Returns:
+        A dictionary suitable for YAML serialization.
+    """
+    return {
+        "version": config.version,
+        "default_action": config.default_action.value,
+        "fields": {
+            name: {"action": entry.action.value, **entry.options}
+            for name, entry in config.fields.items()
+        },
+    }
+
+
+def _get_mappings_dir() -> Path:
+    """Get the directory for storing mapping YAML files.
+
+    Returns:
+        Path to ~/.cecil/mappings/ directory (created if not exists).
+    """
+    mappings_dir = Path.home() / ".cecil" / "mappings"
+    mappings_dir.mkdir(parents=True, exist_ok=True)
+    return mappings_dir
+
+
+def _persist_mapping_to_yaml(mapping_id: str, config: MappingConfig) -> str:
+    """Persist a mapping configuration to a YAML file on disk.
+
+    Args:
+        mapping_id: The unique mapping identifier.
+        config: The domain MappingConfig to persist.
+
+    Returns:
+        The absolute path to the saved YAML file.
+
+    Raises:
+        OSError: If the file cannot be written.
+    """
+    mappings_dir = _get_mappings_dir()
+    yaml_path = mappings_dir / f"{mapping_id}.yaml"
+
+    mapping_dict = _mapping_config_to_dict(config)
+
+    try:
+        with yaml_path.open("w", encoding="utf-8") as f:
+            yaml.safe_dump(mapping_dict, f, default_flow_style=False, sort_keys=False)
+    except OSError:
+        logger.error(
+            "Failed to persist mapping to YAML",
+            extra={"mapping_id": mapping_id, "yaml_path": str(yaml_path)},
+        )
+        raise
+
+    logger.info(
+        "Mapping persisted to disk",
+        extra={"mapping_id": mapping_id, "yaml_path": str(yaml_path)},
+    )
+
+    return str(yaml_path)
+
+
+def _load_mappings_from_disk() -> None:
+    """Load all existing mapping YAML files from disk into the in-memory store.
+
+    Scans ~/.cecil/mappings/ for .yaml files and loads them into _mapping_store.
+    This function is called once on module load to restore mappings across restarts.
+    """
+    mappings_dir = _get_mappings_dir()
+
+    if not mappings_dir.exists():
+        logger.debug("Mappings directory does not exist; skipping load")
+        return
+
+    parser = MappingParser()
+    loaded_count = 0
+
+    for yaml_file in mappings_dir.glob("*.yaml"):
+        try:
+            # Extract mapping_id from filename (strip .yaml extension)
+            mapping_id = yaml_file.stem
+
+            # Parse the YAML file
+            config = parser.parse_file(yaml_file)
+
+            # Use file modification time as created_at
+            stat = yaml_file.stat()
+            created_at = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
+
+            # Store in memory
+            _mapping_store[mapping_id] = MappingState(
+                mapping_id=mapping_id,
+                config=config,
+                created_at=created_at,
+                yaml_path=str(yaml_file),
+            )
+
+            loaded_count += 1
+        except CecilError as err:
+            logger.warning(
+                "Failed to load mapping from disk",
+                extra={
+                    "yaml_file": str(yaml_file),
+                    "error_type": type(err).__name__,
+                    "error": str(err),
+                },
+            )
+            continue
+
+    if loaded_count > 0:
+        logger.info(
+            "Loaded mappings from disk",
+            extra={"count": loaded_count},
+        )
+
+
+# Load existing mappings from disk on module import
+_load_mappings_from_disk()
 
 
 def _truncate(value: str, max_length: int = _MAX_SAFE_PIPE_VALUE_LENGTH) -> str:
@@ -112,6 +239,7 @@ def _config_to_response(
     mapping_id: str,
     config: MappingConfig,
     created_at: datetime,
+    yaml_path: str | None = None,
 ) -> MappingConfigResponse:
     """Convert a domain MappingConfig to an API response.
 
@@ -119,6 +247,7 @@ def _config_to_response(
         mapping_id: The unique mapping identifier.
         config: The domain MappingConfig.
         created_at: When the mapping was created.
+        yaml_path: Optional path to the persisted YAML file.
 
     Returns:
         A MappingConfigResponse suitable for API serialization.
@@ -137,6 +266,7 @@ def _config_to_response(
         fields=fields,
         policy_hash=config.policy_hash(),
         created_at=created_at,
+        yaml_path=yaml_path,
     )
 
 
@@ -189,10 +319,16 @@ async def create_mapping(
 
     mapping_id = str(uuid4())
     now = datetime.now(tz=UTC)
+
+    # Persist to disk
+    yaml_path = _persist_mapping_to_yaml(mapping_id, config)
+
+    # Store in memory
     _mapping_store[mapping_id] = MappingState(
         mapping_id=mapping_id,
         config=config,
         created_at=now,
+        yaml_path=yaml_path,
     )
 
     logger.info(
@@ -200,7 +336,7 @@ async def create_mapping(
         extra={"mapping_id": mapping_id, "field_count": len(config.fields)},
     )
 
-    return _config_to_response(mapping_id, config, now)
+    return _config_to_response(mapping_id, config, now, yaml_path)
 
 
 @router.get(
@@ -214,7 +350,7 @@ async def list_mappings() -> list[MappingConfigResponse]:
         A list of MappingConfigResponse objects for all stored mappings.
     """
     return [
-        _config_to_response(state.mapping_id, state.config, state.created_at)
+        _config_to_response(state.mapping_id, state.config, state.created_at, state.yaml_path)
         for state in _mapping_store.values()
     ]
 
@@ -271,6 +407,7 @@ async def load_mapping_yaml(
         mapping_id=mapping_id,
         config=config,
         created_at=now,
+        yaml_path=str(resolved),
     )
 
     logger.info(
@@ -278,7 +415,7 @@ async def load_mapping_yaml(
         extra={"mapping_id": mapping_id, "field_count": len(config.fields)},
     )
 
-    return _config_to_response(mapping_id, config, now)
+    return _config_to_response(mapping_id, config, now, str(resolved))
 
 
 @router.get(
@@ -304,7 +441,7 @@ async def get_mapping(mapping_id: str) -> MappingConfigResponse | JSONResponse:
                 message="No mapping found with the given ID",
             ).model_dump(),
         )
-    return _config_to_response(state.mapping_id, state.config, state.created_at)
+    return _config_to_response(state.mapping_id, state.config, state.created_at, state.yaml_path)
 
 
 @router.put(
@@ -357,12 +494,23 @@ async def update_mapping(
 
     state.config = config
 
+    # Update the YAML file on disk if it exists
+    if state.yaml_path:
+        try:
+            yaml_path = _persist_mapping_to_yaml(mapping_id, config)
+            state.yaml_path = yaml_path
+        except OSError as err:
+            logger.warning(
+                "Failed to update mapping YAML file",
+                extra={"mapping_id": mapping_id, "error": str(err)},
+            )
+
     logger.info(
         "Mapping updated",
         extra={"mapping_id": mapping_id, "field_count": len(config.fields)},
     )
 
-    return _config_to_response(state.mapping_id, state.config, state.created_at)
+    return _config_to_response(state.mapping_id, state.config, state.created_at, state.yaml_path)
 
 
 @router.delete(
@@ -380,7 +528,8 @@ async def delete_mapping(mapping_id: str) -> Response | JSONResponse:
     Returns:
         204 No Content on success, or 404 if not found.
     """
-    if mapping_id not in _mapping_store:
+    state = _mapping_store.get(mapping_id)
+    if state is None:
         return JSONResponse(
             status_code=404,
             content=ErrorResponse(
@@ -388,6 +537,22 @@ async def delete_mapping(mapping_id: str) -> Response | JSONResponse:
                 message="No mapping found with the given ID",
             ).model_dump(),
         )
+
+    # Delete the YAML file from disk if it exists
+    if state.yaml_path:
+        yaml_file = Path(state.yaml_path)
+        try:
+            if yaml_file.exists():
+                yaml_file.unlink()
+                logger.info(
+                    "Mapping YAML file deleted",
+                    extra={"mapping_id": mapping_id, "yaml_path": state.yaml_path},
+                )
+        except OSError as err:
+            logger.warning(
+                "Failed to delete mapping YAML file",
+                extra={"mapping_id": mapping_id, "yaml_path": state.yaml_path, "error": str(err)},
+            )
 
     del _mapping_store[mapping_id]
 
