@@ -100,6 +100,24 @@ export interface BrowseResponse {
 }
 
 /**
+ * Metadata for a single uploaded file (returned by the upload endpoint)
+ */
+export interface UploadedFileInfo {
+  name: string;
+  path: string;
+  size: number;
+  format: FileFormat | null;
+}
+
+/**
+ * Response from the file upload endpoint
+ */
+export interface UploadResponse {
+  files: UploadedFileInfo[];
+  errors: string[];
+}
+
+/**
  * Real-time progress information for an active scan
  */
 export interface ScanProgress {

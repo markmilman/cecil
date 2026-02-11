@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance, type AxiosError } from 'axios';
-import type { BrowseResponse, ScanRequest, ScanResponse } from '@/types';
+import type { BrowseResponse, ScanRequest, ScanResponse, UploadResponse } from '@/types';
 
 /**
  * Configuration for the API client
@@ -144,6 +144,26 @@ export class ApiClient {
     const response = await this.client.get<BrowseResponse>('/api/v1/filesystem/browse', {
       params,
     });
+    return response.data;
+  }
+
+  /**
+   * Upload one or more files to the server for scanning
+   *
+   * @param files - Array of File objects from a file input
+   * @returns Upload response with file metadata and any errors
+   * @throws {ApiClientError} If the upload request fails
+   */
+  async uploadFiles(files: File[]): Promise<UploadResponse> {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('files', file);
+    }
+    const response = await this.client.post<UploadResponse>(
+      '/api/v1/filesystem/upload',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
     return response.data;
   }
 

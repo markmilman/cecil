@@ -145,6 +145,31 @@ class BrowseResponse(BaseModel):
     )
 
 
+class UploadedFileInfo(BaseModel):
+    """Metadata for a single uploaded file."""
+
+    name: str = Field(description="Original filename")
+    path: str = Field(description="Server-side path where the file was saved")
+    size: int = Field(description="File size in bytes")
+    format: FileFormat | None = Field(
+        default=None,
+        description="Detected file format from extension",
+    )
+
+
+class UploadResponse(BaseModel):
+    """Response from the file upload endpoint."""
+
+    files: list[UploadedFileInfo] = Field(
+        default_factory=list,
+        description="List of successfully uploaded files",
+    )
+    errors: list[str] = Field(
+        default_factory=list,
+        description="List of files that failed to upload (unsupported format, etc.)",
+    )
+
+
 class ScanProgress(BaseModel):
     """Real-time progress information for an active scan."""
 

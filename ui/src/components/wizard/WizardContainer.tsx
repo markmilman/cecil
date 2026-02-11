@@ -3,19 +3,10 @@ import { UploadZone } from './UploadZone';
 import { QueuedFiles } from './QueuedFiles';
 import { ProcessingView } from './ProcessingView';
 import { CompletionView } from './CompletionView';
+import { apiClient } from '@/lib/apiClient';
 
-import type { QueuedFile } from './QueuedFiles';
+import type { UploadedFileInfo } from '@/types';
 import type { WizardStep } from '@/types';
-
-/**
- * Mock files added when the user "browses" in Step 1.
- * These flow through the wizard to demonstrate the full pipeline.
- */
-const MOCK_FILES: QueuedFile[] = [
-  { name: 'app-logs-prod.jsonl', size: '2.4 MB' },
-  { name: 'api-requests-2024.csv', size: '890 KB' },
-  { name: 'user-sessions.parquet', size: '1.1 MB' },
-];
 
 interface WizardContainerProps {
   onBackToDashboard: () => void;
@@ -25,22 +16,39 @@ interface WizardContainerProps {
  * WizardContainer component
  *
  * Manages the 4-step ingestion wizard flow:
- *   Step 1: UploadZone — file selection
- *   Step 2: QueuedFiles — review queued files
+ *   Step 1: UploadZone — file selection via native file picker
+ *   Step 2: QueuedFiles — review uploaded files
  *   Step 3: ProcessingView — sanitization progress
  *   Step 4: CompletionView — results and CTA
  *
- * Owns the step state machine and the mock file list that
+ * Owns the step state machine and the uploaded file list that
  * persists across steps. Each step transition applies a fadeIn
  * animation via the animate-fade-in CSS class.
  */
 export function WizardContainer({ onBackToDashboard }: WizardContainerProps) {
   const [step, setStep] = useState<WizardStep>(1);
-  const [files, setFiles] = useState<QueuedFile[]>([]);
+  const [files, setFiles] = useState<UploadedFileInfo[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const handleBrowseFiles = useCallback(() => {
-    setFiles(MOCK_FILES);
-    setStep(2);
+  const handleBrowseFiles = useCallback(async (fileList: FileList) => {
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const selected = Array.from(fileList);
+      const response = await apiClient.uploadFiles(selected);
+      if (response.files.length > 0) {
+        setFiles(response.files);
+        setStep(2);
+      }
+      if (response.errors.length > 0) {
+        setUploadError(response.errors.join('; '));
+      }
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Failed to upload files');
+    } finally {
+      setIsUploading(false);
+    }
   }, []);
 
   const handleRemoveFile = useCallback((index: number) => {
@@ -67,7 +75,11 @@ export function WizardContainer({ onBackToDashboard }: WizardContainerProps) {
   return (
     <div key={step} className="animate-fade-in">
       {step === 1 && (
-        <UploadZone onBrowseFiles={handleBrowseFiles} />
+        <UploadZone
+          onBrowseFiles={handleBrowseFiles}
+          isUploading={isUploading}
+          uploadError={uploadError}
+        />
       )}
       {step === 2 && (
         <QueuedFiles

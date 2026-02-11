@@ -1,20 +1,28 @@
-"""Filesystem browse API route.
+"""Filesystem browse and upload API routes.
 
 Provides a GET /api/v1/filesystem/browse endpoint that lists directory
-contents for the frontend file browser modal.  Includes security
-hardening against path traversal and symlink escape attacks.
+contents for the frontend file browser modal, and a POST /api/v1/filesystem/upload
+endpoint for browser-based file uploads.  Includes security hardening against
+path traversal and symlink escape attacks.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, UploadFile
 
-from cecil.api.schemas import BrowseResponse, FileFormat, FilesystemEntry
+from cecil.api.schemas import (
+    BrowseResponse,
+    FileFormat,
+    FilesystemEntry,
+    UploadedFileInfo,
+    UploadResponse,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -229,3 +237,99 @@ async def browse_filesystem(
         directories=directories,
         files=files,
     )
+
+
+# Persistent upload directory for the current process.  Created once on
+# first upload and reused for all subsequent uploads.
+_upload_dir: Path | None = None
+
+
+def _get_upload_dir() -> Path:
+    """Return the uploads directory, creating it if necessary.
+
+    Uses a temporary directory under the system temp path so uploaded
+    files are automatically cleaned up on reboot.
+
+    Returns:
+        Absolute path to the uploads directory.
+    """
+    global _upload_dir
+    if _upload_dir is None or not _upload_dir.is_dir():
+        _upload_dir = Path(tempfile.mkdtemp(prefix="cecil_uploads_"))
+        logger.info("Created upload directory", extra={"path": str(_upload_dir)})
+    return _upload_dir
+
+
+@router.post(
+    "/upload",
+    response_model=UploadResponse,
+)
+async def upload_files(
+    files: list[UploadFile],
+) -> UploadResponse:
+    """Upload one or more data files for scanning.
+
+    Accepts multipart file uploads, validates extensions, and saves
+    files to a temporary directory.  Returns metadata for each
+    successfully uploaded file including the server-side path that
+    can be passed to the scan endpoint.
+
+    Args:
+        files: List of uploaded files from the multipart request.
+
+    Returns:
+        An UploadResponse with metadata for uploaded files and any errors.
+    """
+    upload_dir = _get_upload_dir()
+    uploaded: list[UploadedFileInfo] = []
+    errors: list[str] = []
+
+    for upload_file in files:
+        filename = upload_file.filename or "unnamed"
+
+        # Sanitise the filename — strip path separators to prevent traversal.
+        safe_name = Path(filename).name
+        if not safe_name:
+            errors.append(f"Invalid filename: {filename}")
+            continue
+
+        # Validate extension.
+        suffix = Path(safe_name).suffix.lower()
+        detected_format = _EXTENSION_FORMAT_MAP.get(suffix)
+        if detected_format is None:
+            errors.append(
+                f"Unsupported file format for '{safe_name}'. "
+                f"Supported: {', '.join(_SUPPORTED_EXTENSIONS)}"
+            )
+            continue
+
+        # Write file to disk in chunks to stay within memory bounds.
+        dest = upload_dir / safe_name
+        total_bytes = 0
+        try:
+            with dest.open("wb") as f:
+                while chunk := await upload_file.read(8192):
+                    f.write(chunk)
+                    total_bytes += len(chunk)
+        except OSError as err:
+            errors.append(f"Failed to save '{safe_name}': {type(err).__name__}")
+            logger.warning(
+                "File upload write failed",
+                extra={"filename": safe_name, "error_type": type(err).__name__},
+            )
+            continue
+
+        uploaded.append(
+            UploadedFileInfo(
+                name=safe_name,
+                path=str(dest),
+                size=total_bytes,
+                format=detected_format,
+            )
+        )
+        logger.info(
+            "File uploaded",
+            extra={"filename": safe_name, "size_bytes": total_bytes},
+        )
+
+    return UploadResponse(files=uploaded, errors=errors)
