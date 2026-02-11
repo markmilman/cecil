@@ -6,7 +6,6 @@
  * and optional validation/preview panels.
  */
 
-import { useEffect } from 'react';
 import { ArrowLeftIcon, AlertCircleIcon, Loader2Icon } from 'lucide-react';
 import { useMapping } from '@/hooks/useMapping';
 import { MappingToolbar } from './MappingToolbar';
@@ -39,13 +38,6 @@ export function MappingEditor({ source, onBackToDashboard, onMappingComplete }: 
     dismissValidation,
     dismissPreview,
   } = useMapping(source);
-
-  // Auto-return to wizard after saving when onMappingComplete is provided
-  useEffect(() => {
-    if (savedMappingId && onMappingComplete) {
-      onMappingComplete(savedMappingId);
-    }
-  }, [savedMappingId, onMappingComplete]);
 
   if (isLoading) {
     return (
