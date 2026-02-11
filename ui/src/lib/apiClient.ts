@@ -327,6 +327,20 @@ export class ApiClient {
   }
 
   /**
+   * Cancel a running scan
+   *
+   * @param scanId - Unique scan identifier
+   * @returns Scan response with updated status
+   * @throws {ApiClientError} If the cancellation fails
+   */
+  async cancelScan(scanId: string): Promise<ScanResponse> {
+    const response = await this.client.post<ScanResponse>(
+      `/api/v1/scans/${scanId}/cancel`,
+    );
+    return response.data;
+  }
+
+  /**
    * Open a directory in the system file manager
    *
    * @param path - Absolute path to the directory to open
