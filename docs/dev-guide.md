@@ -36,7 +36,7 @@ Opens a Vite dev server at **http://localhost:5173/** with hot module replacemen
 ### Backend (FastAPI)
 
 ```bash
-uvicorn cecil.api:app --host 127.0.0.1 --port 4921 --reload
+uvicorn cecil.api.server:app --host 127.0.0.1 --port 4921 --reload
 ```
 
 The `--reload` flag watches for Python file changes and restarts automatically.
