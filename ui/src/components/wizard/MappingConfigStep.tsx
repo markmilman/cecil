@@ -29,6 +29,7 @@ export function MappingConfigStep({
   const [mappingId, setMappingId] = useState<string | null>(initialMappingId ?? null);
   const [yamlPath, setYamlPath] = useState('');
   const [outputDir, setOutputDir] = useState('~/.cecil/output/');
+  const [outputDirError, setOutputDirError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(
@@ -51,11 +52,29 @@ export function MappingConfigStep({
     }
   }, [yamlPath]);
 
+  const validateOutputDir = useCallback((path: string): string | null => {
+    const trimmed = path.trim();
+    if (!trimmed) {
+      return 'Output directory cannot be empty';
+    }
+    // Check for invalid characters (Windows-style invalid chars that are also problematic on Unix)
+    const invalidChars = /[<>:"|?*\0]/;
+    if (invalidChars.test(trimmed)) {
+      return 'Output directory contains invalid characters';
+    }
+    return null;
+  }, []);
+
+  const handleOutputDirChange = useCallback((value: string) => {
+    setOutputDir(value);
+    setOutputDirError(validateOutputDir(value));
+  }, [validateOutputDir]);
+
   const handleStartSanitization = useCallback(() => {
-    if (mappingId && outputDir.trim()) {
+    if (mappingId && outputDir.trim() && !outputDirError) {
       onReady(mappingId, outputDir.trim());
     }
-  }, [mappingId, outputDir, onReady]);
+  }, [mappingId, outputDir, outputDirError, onReady]);
 
   return (
     <div>
@@ -227,11 +246,11 @@ export function MappingConfigStep({
             id="output-dir"
             type="text"
             value={outputDir}
-            onChange={(e) => setOutputDir(e.target.value)}
+            onChange={(e) => handleOutputDirChange(e.target.value)}
             style={{
               width: '100%',
               padding: '8px 12px',
-              border: '1px solid var(--border-color)',
+              border: `1px solid ${outputDirError ? 'var(--danger-border)' : 'var(--border-color)'}`,
               borderRadius: '6px',
               fontSize: '14px',
               color: 'var(--text-primary)',
@@ -239,15 +258,27 @@ export function MappingConfigStep({
               boxSizing: 'border-box',
             }}
           />
-          <p
-            style={{
-              margin: '4px 0 0',
-              fontSize: '12px',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            Sanitized files will be saved here
-          </p>
+          {outputDirError ? (
+            <p
+              style={{
+                margin: '4px 0 0',
+                fontSize: '12px',
+                color: 'var(--danger-color)',
+              }}
+            >
+              {outputDirError}
+            </p>
+          ) : (
+            <p
+              style={{
+                margin: '4px 0 0',
+                fontSize: '12px',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              Sanitized files will be saved here
+            </p>
+          )}
         </div>
 
         {/* Footer Actions */}
@@ -270,7 +301,7 @@ export function MappingConfigStep({
             type="button"
             className="btn btn-primary"
             onClick={handleStartSanitization}
-            disabled={!mappingId || !outputDir.trim()}
+            disabled={!mappingId || !outputDir.trim() || !!outputDirError}
           >
             Start Sanitization
           </button>
