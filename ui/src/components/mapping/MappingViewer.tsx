@@ -123,6 +123,23 @@ export function MappingViewer({ mapping, onBack }: MappingViewerProps) {
               {mapping.policy_hash.substring(0, 12)}...
             </span>
           </div>
+          {mapping.yaml_path && (
+            <div style={{ gridColumn: '1 / -1' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>YAML Path:</span>{' '}
+              <span
+                style={{
+                  fontWeight: 500,
+                  color: 'var(--text-primary)',
+                  fontFamily: 'monospace',
+                  fontSize: '12px',
+                  wordBreak: 'break-all',
+                }}
+                title={mapping.yaml_path}
+              >
+                {mapping.yaml_path}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
