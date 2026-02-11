@@ -196,7 +196,11 @@ export function MappingConfigStep({
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => onCreateMapping(files[0]?.path ?? '')}
+              onClick={() => {
+                if (files.length > 0 && files[0]?.path) {
+                  onCreateMapping(files[0].path);
+                }
+              }}
               disabled={files.length === 0}
             >
               Open Mapping Editor
