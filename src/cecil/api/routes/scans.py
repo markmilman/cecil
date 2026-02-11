@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -68,6 +69,7 @@ class ScanState:
     output_path: str | None = None
     records_sanitized: int = 0
     records_failed: int = 0
+    _cancel_event: threading.Event = field(default_factory=threading.Event)
 
 
 # In-memory scan store keyed by scan_id.
@@ -285,6 +287,15 @@ def _execute_sanitize(
     try:
         provider.connect()
         for sanitized_record in engine.process_stream(provider.stream_records()):
+            # Check for cancellation before processing each record.
+            if state._cancel_event.is_set():
+                state.status = ScanStatus.CANCELLED
+                logger.info(
+                    "Sanitization cancelled",
+                    extra={"scan_id": scan_id, "records_processed": engine.records_processed},
+                )
+                return
+
             writer.write_record(sanitized_record.data)
             state.records_processed = engine.records_processed
             state.records_sanitized = engine.records_sanitized
@@ -477,6 +488,56 @@ async def get_scan(scan_id: str) -> ScanResponse | JSONResponse:
     return _scan_state_to_response(state)
 
 
+@router.post(
+    "/{scan_id}/cancel",
+    response_model=ScanResponse,
+    responses={404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
+)
+async def cancel_scan(scan_id: str) -> ScanResponse | JSONResponse:
+    """Cancel a running scan.
+
+    Sets the cancellation flag on the scan, which will be checked
+    by the background task on its next iteration. The scan status
+    will transition to CANCELLED once the task stops processing.
+
+    Args:
+        scan_id: The unique scan identifier.
+
+    Returns:
+        A ScanResponse with the scan's current metadata, or a 404
+        JSONResponse if no scan matches the given ID, or a 422
+        JSONResponse if the scan is not in a cancellable state.
+    """
+    state = _scan_store.get(scan_id)
+    if state is None:
+        return JSONResponse(
+            status_code=404,
+            content=ErrorResponse(
+                error="scan_not_found",
+                message="No scan found with the given ID",
+            ).model_dump(),
+        )
+
+    # Only PENDING or RUNNING scans can be cancelled.
+    if state.status not in (ScanStatus.PENDING, ScanStatus.RUNNING):
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="scan_not_cancellable",
+                message=f"Scan with status '{state.status}' cannot be cancelled",
+            ).model_dump(),
+        )
+
+    # Set the cancellation flag.
+    state._cancel_event.set()
+    logger.info(
+        "Scan cancellation requested",
+        extra={"scan_id": scan_id, "current_status": state.status.value},
+    )
+
+    return _scan_state_to_response(state)
+
+
 @router.websocket("/{scan_id}/ws")
 async def scan_progress_ws(websocket: WebSocket, scan_id: str) -> None:
     """Stream real-time scan progress over WebSocket.
@@ -510,7 +571,7 @@ async def scan_progress_ws(websocket: WebSocket, scan_id: str) -> None:
             )
             await websocket.send_json(progress.model_dump())
 
-            if state.status in (ScanStatus.COMPLETED, ScanStatus.FAILED):
+            if state.status in (ScanStatus.COMPLETED, ScanStatus.FAILED, ScanStatus.CANCELLED):
                 break
 
             await asyncio.sleep(0.5)
