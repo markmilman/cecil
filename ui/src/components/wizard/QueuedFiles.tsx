@@ -1,4 +1,4 @@
-import { FileTextIcon, XIcon } from 'lucide-react';
+import { FileTextIcon, XIcon, ArrowLeftIcon } from 'lucide-react';
 import { WizardHeader } from './WizardHeader';
 import { TrustBadge } from './TrustBadge';
 import type { UploadedFileInfo } from '@/types';
@@ -11,6 +11,7 @@ interface QueuedFilesProps {
   onRemoveFile: (index: number) => void;
   onCancel: () => void;
   onSanitize: () => void;
+  onBack: () => void;
 }
 
 /**
@@ -28,7 +29,7 @@ function formatFileSize(bytes: number): string {
  * QueuedFiles component (Wizard Step 2)
  *
  * Shows a list of uploaded files with file icons, name/size/format,
- * and remove buttons. Includes Cancel and "Sanitize N Files"
+ * and remove buttons. Includes Back, Cancel, and "Sanitize N Files"
  * action buttons in a footer.
  */
 export function QueuedFiles({
@@ -36,6 +37,7 @@ export function QueuedFiles({
   onRemoveFile,
   onCancel,
   onSanitize,
+  onBack,
 }: QueuedFilesProps) {
   return (
     <div>
@@ -124,9 +126,8 @@ export function QueuedFiles({
 
         {/* Footer Actions */}
         <div
-          className="flex items-center justify-end"
+          className="flex items-center justify-between"
           style={{
-            gap: '12px',
             borderTop: '1px solid var(--border-color)',
             paddingTop: '24px',
           }}
@@ -134,18 +135,28 @@ export function QueuedFiles({
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={onCancel}
+            onClick={onBack}
           >
-            Cancel
+            <ArrowLeftIcon className="h-4 w-4" />
+            Back
           </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={onSanitize}
-            disabled={files.length === 0}
-          >
-            Next: Configure Mapping
-          </button>
+          <div className="flex items-center" style={{ gap: '12px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onSanitize}
+              disabled={files.length === 0}
+            >
+              Next: Configure Mapping
+            </button>
+          </div>
         </div>
       </div>
     </div>
