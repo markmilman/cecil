@@ -112,6 +112,16 @@ export function WizardContainer({
     setStep(3);
   }, []);
 
+  const handleOpenFolder = useCallback(async () => {
+    try {
+      const path = sanitizeResult?.outputPath ?? outputDir;
+      await apiClient.openDirectory(path);
+    } catch (err) {
+      // Silently fail - opening folder is a convenience feature
+      console.error('Failed to open folder:', err);
+    }
+  }, [sanitizeResult, outputDir]);
+
   return (
     <div key={step} className="animate-fade-in">
       {step === 1 && (
@@ -154,6 +164,7 @@ export function WizardContainer({
           recordsProcessed={sanitizeResult?.recordsProcessed}
           recordsSanitized={sanitizeResult?.recordsSanitized}
           onBackToDashboard={onBackToDashboard}
+          onOpenFolder={handleOpenFolder}
         />
       )}
     </div>

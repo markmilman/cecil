@@ -327,6 +327,21 @@ export class ApiClient {
   }
 
   /**
+   * Open a directory in the system file manager
+   *
+   * @param path - Absolute path to the directory to open
+   * @returns Response indicating success or failure
+   * @throws {ApiClientError} If the request fails
+   */
+  async openDirectory(path: string): Promise<{ success: boolean; message?: string }> {
+    const response = await this.client.post<{ success: boolean; message?: string }>(
+      '/api/v1/filesystem/open-directory',
+      { path },
+    );
+    return response.data;
+  }
+
+  /**
    * Get the underlying Axios instance for custom requests
    *
    * @returns The configured Axios instance
