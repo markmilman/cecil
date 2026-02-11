@@ -143,6 +143,7 @@ export function WizardContainer({
           onRemoveFile={handleRemoveFile}
           onCancel={handleCancel}
           onSanitize={handleSanitize}
+          onBack={() => setStep(1)}
         />
       )}
       {step === 3 && (
@@ -172,6 +173,7 @@ export function WizardContainer({
           onBackToDashboard={onBackToDashboard}
           onOpenFolder={handleOpenFolder}
           onGetReport={handleGetReport}
+          onBack={() => setStep(3)}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import { CheckIcon } from 'lucide-react';
+import { CheckIcon, ArrowLeftIcon } from 'lucide-react';
 import { LocalOutputCard } from './LocalOutputCard';
 import { CostAnalysisCTA } from './CostAnalysisCTA';
 
@@ -8,6 +8,7 @@ interface CompletionViewProps {
   onBackToDashboard: () => void;
   onOpenFolder?: () => void;
   onGetReport?: () => void;
+  onBack: () => void;
   recordsProcessed?: number;
   recordsSanitized?: number;
 }
@@ -16,8 +17,8 @@ interface CompletionViewProps {
  * Wizard Step 5: Completion view.
  *
  * Shows a success header with green checkmark circle, "Sanitization
- * Complete" heading, subtitle with file/record count, and "Back to Dashboard"
- * button. Below is a 2-column grid with LocalOutputCard (left) and
+ * Complete" heading, subtitle with file/record count, and navigation buttons.
+ * Below is a 2-column grid with LocalOutputCard (left) and
  * CostAnalysisCTA (right).
  */
 export function CompletionView({
@@ -26,6 +27,7 @@ export function CompletionView({
   onBackToDashboard,
   onOpenFolder,
   onGetReport,
+  onBack,
   recordsProcessed,
   recordsSanitized,
 }: CompletionViewProps) {
@@ -72,13 +74,23 @@ export function CompletionView({
             }
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={onBackToDashboard}
-        >
-          Back to Dashboard
-        </button>
+        <div className="flex items-center" style={{ gap: '12px' }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onBack}
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            Back
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onBackToDashboard}
+          >
+            Back to Dashboard
+          </button>
+        </div>
       </div>
 
       {/* 2-column grid: Local Output + CTA */}
