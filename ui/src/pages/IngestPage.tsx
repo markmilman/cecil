@@ -10,6 +10,10 @@ import { getErrorMessage } from '@/lib/errorMessages';
 import type { FileFormat, UploadedFileInfo } from '@/types';
 import { ScanStatus } from '@/types';
 
+interface IngestPageProps {
+  onViewResults?: (source: string, scanId: string) => void;
+}
+
 /**
  * IngestPage component
  *
@@ -17,7 +21,7 @@ import { ScanStatus } from '@/types';
  * native file picker, then initiate a scan. Real-time progress is displayed
  * via WebSocket connection.
  */
-export function IngestPage() {
+export function IngestPage({ onViewResults }: IngestPageProps) {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileInfo[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -129,6 +133,13 @@ export function IngestPage() {
     await handleSubmit();
   };
 
+  // Handler: navigate to audit/mapping view with scan results
+  const handleViewResults = () => {
+    if (scanId && uploadedFiles.length > 0 && onViewResults) {
+      onViewResults(uploadedFiles[0].path, scanId);
+    }
+  };
+
   return (
     <>
     <WelcomeModal />
@@ -226,7 +237,7 @@ export function IngestPage() {
               <div className="flex items-center justify-center gap-4">
                 <button
                   type="button"
-                  onClick={handleNewScan}
+                  onClick={handleViewResults}
                   className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-lg font-medium transition-colors duration-150"
                 >
                   View Audit Results

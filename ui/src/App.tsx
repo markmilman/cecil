@@ -5,6 +5,7 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { WizardContainer } from '@/components/wizard/WizardContainer';
 import { MappingPage } from '@/pages/MappingPage';
+import { IngestPage } from '@/pages/IngestPage';
 
 import type { ActiveView } from '@/types';
 
@@ -21,7 +22,7 @@ export function App() {
   const [wizardMappingId, setWizardMappingId] = useState<string | null>(null);
 
   const handleNavigate = useCallback((view: string) => {
-    if (view === 'dashboard' || view === 'wizard' || view === 'mapping') {
+    if (view === 'dashboard' || view === 'wizard' || view === 'mapping' || view === 'ingest') {
       setActiveView(view);
     }
   }, []);
@@ -46,6 +47,11 @@ export function App() {
 
   const handleClearWizardMappingId = useCallback(() => {
     setWizardMappingId(null);
+  }, []);
+
+  const handleViewResults = useCallback((source: string, scanId: string) => {
+    setMappingSource(source);
+    setActiveView('mapping');
   }, []);
 
   return (
@@ -80,6 +86,9 @@ export function App() {
                 onBackToDashboard={handleBackToDashboard}
                 onMappingComplete={handleMappingComplete}
               />
+            )}
+            {activeView === 'ingest' && (
+              <IngestPage onViewResults={handleViewResults} />
             )}
           </ErrorBoundary>
         </div>
