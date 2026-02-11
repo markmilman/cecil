@@ -270,6 +270,10 @@ class MappingConfigResponse(BaseModel):
     )
     policy_hash: str = Field(description="SHA-256 hash of the mapping policy")
     created_at: datetime = Field(description="Timestamp when the mapping was created")
+    yaml_path: str | None = Field(
+        default=None,
+        description="Path to the persisted YAML file on disk (if saved)",
+    )
 
 
 class MappingValidationRequest(BaseModel):
