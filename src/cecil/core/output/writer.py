@@ -32,10 +32,11 @@ class JsonlWriter:
     """
 
     def __init__(self, output_path: Path) -> None:
-        self.output_path: Path = output_path
+        # Expand tilde and resolve to absolute path
+        self.output_path: Path = output_path.expanduser().resolve()
         self.records_written: int = 0
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        self._file = open(output_path, "w", encoding="utf-8")  # noqa: SIM115
+        self.output_path.parent.mkdir(parents=True, exist_ok=True)
+        self._file = open(self.output_path, "w", encoding="utf-8")  # noqa: SIM115
 
     def write_record(self, record: dict[str, Any]) -> None:
         """Write a single record as a JSON line.
