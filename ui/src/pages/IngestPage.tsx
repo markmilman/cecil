@@ -139,17 +139,17 @@ export function IngestPage() {
           <UploadIcon className="h-8 w-8 text-accent" />
           <h1 className="text-3xl font-extrabold text-primary">File Ingestion</h1>
         </div>
-        <p className="text-slate-600 leading-relaxed mb-8">
+        <p className="text-muted leading-relaxed mb-8">
           Upload data files to sanitize. Supported formats: JSONL, CSV, and Parquet.
         </p>
 
         {/* Inline Helper Banner */}
         {showHelper && pageState === 'idle' && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-8 flex items-start gap-3">
-            <InfoIcon className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+          <div className="bg-accent-light border border-[var(--border-accent)] rounded-lg p-4 mb-8 flex items-start gap-3">
+            <InfoIcon className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-primary">New to Cecil?</p>
-              <p className="text-sm text-slate-600 mt-0.5">
+              <p className="text-sm text-muted mt-0.5">
                 Click "Browse Files" to select data files from your computer.
                 Cecil uploads them locally and processes everything on your machine.
               </p>
@@ -157,7 +157,7 @@ export function IngestPage() {
             <button
               type="button"
               onClick={dismissHelper}
-              className="flex-shrink-0 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+              className="flex-shrink-0 p-1 text-faint hover:text-muted transition-colors"
               aria-label="Dismiss helper"
             >
               <XIcon className="h-4 w-4" />
@@ -186,7 +186,7 @@ export function IngestPage() {
 
               {/* Error display (API submission errors only) */}
               {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-danger text-sm">
+                <div className="p-4 bg-danger-bg border border-[var(--danger-border)] rounded-lg text-danger text-sm">
                   {error}
                 </div>
               )}
@@ -199,11 +199,11 @@ export function IngestPage() {
                 className={`
                   px-6 py-3 rounded-lg font-medium
                   transition-all duration-150 ease-out
-                  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
+                  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent
                   active:scale-[0.98]
                   ${isSubmitting || isScanning || uploadedFiles.length === 0
-                    ? 'bg-slate-200 text-slate-600 cursor-not-allowed'
-                    : 'bg-accent hover:bg-indigo-700 text-white'
+                    ? 'bg-skeleton text-muted cursor-not-allowed'
+                    : 'bg-accent hover:bg-accent-hover text-white'
                   }
                 `}
               >
@@ -217,7 +217,7 @@ export function IngestPage() {
           )}
 
           {pageState === 'completed' && progress && (
-            <div className="bg-white border border-emerald-200 rounded-lg p-8 text-center">
+            <div className="bg-card border border-[var(--success-border)] rounded-lg p-8 text-center">
               <CheckCircleIcon className="h-12 w-12 text-emerald-500 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-primary mb-2">Scan Complete</h2>
               <p className="text-muted mb-6">
@@ -227,7 +227,7 @@ export function IngestPage() {
                 <button
                   type="button"
                   onClick={handleNewScan}
-                  className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors duration-150"
+                  className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-lg font-medium transition-colors duration-150"
                 >
                   View Audit Results
                   <ArrowRightIcon className="h-4 w-4" />
@@ -235,7 +235,7 @@ export function IngestPage() {
                 <button
                   type="button"
                   onClick={handleNewScan}
-                  className="px-6 py-3 border border-slate-200 text-primary hover:bg-slate-50 rounded-lg font-medium transition-colors duration-150"
+                  className="px-6 py-3 border text-primary hover:bg-subtle rounded-lg font-medium transition-colors duration-150"
                 >
                   Start New Scan
                 </button>
@@ -244,7 +244,7 @@ export function IngestPage() {
           )}
 
           {pageState === 'failed' && progress && (
-            <div className="bg-white border border-red-200 rounded-lg p-8 text-center">
+            <div className="bg-card border border-[var(--danger-border)] rounded-lg p-8 text-center">
               <AlertCircleIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-primary mb-2">Scan Failed</h2>
               <p className="text-muted mb-6">{getErrorMessage(progress.error_type)}</p>
@@ -252,7 +252,7 @@ export function IngestPage() {
                 <button
                   type="button"
                   onClick={handleRetry}
-                  className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors duration-150"
+                  className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-lg font-medium transition-colors duration-150"
                 >
                   <RefreshCwIcon className="h-4 w-4" />
                   Retry
@@ -260,7 +260,7 @@ export function IngestPage() {
                 <button
                   type="button"
                   onClick={handleNewScan}
-                  className="px-6 py-3 border border-slate-200 text-primary hover:bg-slate-50 rounded-lg font-medium transition-colors duration-150"
+                  className="px-6 py-3 border text-primary hover:bg-subtle rounded-lg font-medium transition-colors duration-150"
                 >
                   Upload New Files
                 </button>

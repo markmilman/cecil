@@ -4,23 +4,38 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Cecil design tokens
+        // Text semantic tokens (theme-aware via CSS custom properties)
         primary: {
-          DEFAULT: '#0f172a', // slate-900
-        },
-        accent: {
-          DEFAULT: '#4f46e5', // indigo-600
-          hover: '#4338ca', // indigo-700
-        },
-        success: {
-          DEFAULT: '#10b981', // emerald-500
-        },
-        danger: {
-          DEFAULT: '#ef4444', // red-500
+          DEFAULT: 'var(--text-primary)',
         },
         muted: {
-          DEFAULT: '#64748b', // slate-500
+          DEFAULT: 'var(--text-secondary)',
         },
+        faint: 'var(--text-faint)',
+        // Brand colors
+        accent: {
+          DEFAULT: 'var(--primary-color)',
+          hover: 'var(--primary-hover)',
+          light: 'var(--primary-light)',
+        },
+        success: {
+          DEFAULT: 'var(--success-color)',
+          bg: 'var(--success-bg)',
+        },
+        danger: {
+          DEFAULT: 'var(--danger-color)',
+          bg: 'var(--danger-bg)',
+        },
+        // Surface colors
+        card: 'var(--bg-card)',
+        subtle: 'var(--bg-subtle)',
+        skeleton: 'var(--bg-skeleton)',
+      },
+      borderColor: {
+        DEFAULT: 'var(--border-color)',
+      },
+      outlineColor: {
+        accent: 'var(--primary-color)',
       },
     },
   },

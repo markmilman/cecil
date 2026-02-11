@@ -17,7 +17,7 @@ export function MappingPage() {
             <MapIcon className="h-8 w-8 text-accent" />
             <h1 className="text-3xl font-extrabold text-primary">Schema Mapping</h1>
           </div>
-          <p className="text-slate-600 leading-relaxed">
+          <p className="text-muted leading-relaxed">
             Configure sanitization rules for your data sources
           </p>
         </div>

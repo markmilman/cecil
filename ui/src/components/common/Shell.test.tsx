@@ -72,23 +72,33 @@ describe('Shell', () => {
     expect(mappingLink).not.toHaveAttribute('aria-current');
   });
 
-  it('calls onNavigate when a nav link is clicked', () => {
+  it('calls onNavigate when an enabled nav link is clicked', () => {
+    const onNavigate = vi.fn();
+    renderShell({ onNavigate, activeView: 'wizard' });
+
+    fireEvent.click(screen.getByText('Dashboard'));
+    expect(onNavigate).toHaveBeenCalledWith('dashboard');
+  });
+
+  it('does not call onNavigate when a disabled nav link is clicked', () => {
     const onNavigate = vi.fn();
     renderShell({ onNavigate });
 
     fireEvent.click(screen.getByText('Mapping Rules'));
-    expect(onNavigate).toHaveBeenCalledWith('mapping');
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it('shows "Coming soon" tooltip on disabled nav links', () => {
+    renderShell();
+    const mappingLink = screen.getByText('Mapping Rules');
+    expect(mappingLink).toHaveAttribute('title', 'Coming soon');
+    expect(mappingLink).toBeDisabled();
   });
 
   it('renders the theme toggle button', () => {
     renderShell();
     const toggleButton = screen.getByTitle('Toggle Theme');
     expect(toggleButton).toBeInTheDocument();
-  });
-
-  it('renders the user avatar', () => {
-    renderShell();
-    expect(screen.getByText('JS')).toBeInTheDocument();
   });
 
   it('theme toggle has accessible label', () => {

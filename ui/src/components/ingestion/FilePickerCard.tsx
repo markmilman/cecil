@@ -61,13 +61,13 @@ export function FilePickerCard({
     return (
       <div
         className={`
-          bg-white border-2 border-dashed border-slate-200 rounded-xl p-8
+          bg-card border-2 border-dashed border rounded-xl p-8
           transition-colors duration-200
-          ${disabled ? 'opacity-50' : 'hover:border-indigo-200'}
+          ${disabled ? 'opacity-50' : 'hover:border-[var(--border-accent)]'}
         `}
       >
         <div className="text-center mb-6">
-          <UploadIcon className="h-16 w-16 mx-auto mb-4 text-slate-300" />
+          <UploadIcon className="h-16 w-16 mx-auto mb-4 text-faint" />
           <h3 className="text-lg font-semibold text-primary mb-1">
             Select Data Files to Get Started
           </h3>
@@ -85,10 +85,10 @@ export function FilePickerCard({
             className={`
               flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-white
               transition-colors duration-150
-              focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
+              focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent
               ${disabled
-                ? 'bg-slate-200 text-slate-600 cursor-not-allowed'
-                : 'bg-accent hover:bg-indigo-700'
+                ? 'bg-skeleton text-muted cursor-not-allowed'
+                : 'bg-accent hover:bg-accent-hover'
               }
             `}
           >
@@ -98,7 +98,7 @@ export function FilePickerCard({
         </div>
 
         {uploadError && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-danger text-sm text-center">
+          <div className="mt-4 p-3 bg-danger-bg border border-[var(--danger-border)] rounded-lg text-danger text-sm text-center">
             {uploadError}
           </div>
         )}
@@ -118,7 +118,7 @@ export function FilePickerCard({
   // Uploading state
   if (isUploading) {
     return (
-      <div className="bg-white border-2 border-dashed border-indigo-200 rounded-xl p-8">
+      <div className="bg-card border-2 border-dashed border-[var(--border-accent)] rounded-xl p-8">
         <div className="text-center">
           <Loader2Icon className="h-12 w-12 mx-auto mb-4 text-accent animate-spin" />
           <h3 className="text-lg font-semibold text-primary mb-1">
@@ -134,7 +134,7 @@ export function FilePickerCard({
 
   // Files uploaded — show list
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-6">
+    <div className="bg-card border rounded-xl p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-primary">
           Uploaded Files ({uploadedFiles.length})
@@ -145,11 +145,11 @@ export function FilePickerCard({
           disabled={disabled}
           className={`
             flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg
-            border border-slate-200 transition-colors
-            focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
+            border transition-colors
+            focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent
             ${disabled
-              ? 'text-slate-400 cursor-not-allowed'
-              : 'text-primary hover:bg-slate-50'
+              ? 'text-faint cursor-not-allowed'
+              : 'text-primary hover:bg-subtle'
             }
           `}
         >
@@ -162,16 +162,16 @@ export function FilePickerCard({
         {uploadedFiles.map((file, index) => (
           <div
             key={`${file.name}-${file.path}`}
-            className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg"
+            className="flex items-center gap-3 p-3 bg-subtle rounded-lg"
           >
-            <FileIcon className="h-5 w-5 text-slate-400 flex-shrink-0" />
+            <FileIcon className="h-5 w-5 text-faint flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-primary truncate">
                 {file.name}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 {file.format && (
-                  <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-indigo-50 text-accent uppercase">
+                  <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-accent-light text-accent uppercase">
                     {file.format}
                   </span>
                 )}
@@ -187,8 +187,8 @@ export function FilePickerCard({
               className={`
                 flex-shrink-0 p-1.5 rounded-md transition-colors
                 ${disabled
-                  ? 'text-slate-300 cursor-not-allowed'
-                  : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                  ? 'text-faint cursor-not-allowed'
+                  : 'text-faint hover:text-danger hover:bg-danger-bg'
                 }
               `}
               aria-label={`Remove ${file.name}`}
@@ -200,7 +200,7 @@ export function FilePickerCard({
       </div>
 
       {uploadError && (
-        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-danger text-sm">
+        <div className="mt-3 p-3 bg-danger-bg border border-[var(--danger-border)] rounded-lg text-danger text-sm">
           {uploadError}
         </div>
       )}

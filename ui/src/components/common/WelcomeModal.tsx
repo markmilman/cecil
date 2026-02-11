@@ -33,17 +33,17 @@ function setOnboarded(): void {
 
 const FEATURES = [
   {
-    icon: <HardDriveIcon className="h-5 w-5 text-indigo-600" />,
+    icon: <HardDriveIcon className="h-5 w-5 text-accent" />,
     title: '100% Local Processing',
     description: 'Your data never leaves your machine',
   },
   {
-    icon: <FileTextIcon className="h-5 w-5 text-indigo-600" />,
+    icon: <FileTextIcon className="h-5 w-5 text-accent" />,
     title: 'Multiple Formats',
     description: 'Supports JSONL, CSV, and Parquet files',
   },
   {
-    icon: <SearchIcon className="h-5 w-5 text-indigo-600" />,
+    icon: <SearchIcon className="h-5 w-5 text-accent" />,
     title: 'Real-Time Audit Trail',
     description: 'See exactly what was sanitized',
   },
@@ -76,11 +76,11 @@ export function WelcomeModal({ onDismiss }: WelcomeModalProps) {
       aria-modal="true"
       aria-label="Welcome to Cecil"
     >
-      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-8">
+      <div className="bg-card rounded-xl shadow-xl max-w-lg w-full mx-4 p-8">
         {/* Icon */}
         <div className="flex justify-center mb-6">
-          <div className="h-16 w-16 rounded-full bg-indigo-50 flex items-center justify-center">
-            <ShieldCheckIcon className="h-8 w-8 text-indigo-600" />
+          <div className="h-16 w-16 rounded-full bg-accent-light flex items-center justify-center">
+            <ShieldCheckIcon className="h-8 w-8 text-accent" />
           </div>
         </div>
 
@@ -96,19 +96,20 @@ export function WelcomeModal({ onDismiss }: WelcomeModalProps) {
               <div className="flex-shrink-0 mt-0.5">{feature.icon}</div>
               <div>
                 <h3 className="text-sm font-semibold text-primary">{feature.title}</h3>
-                <p className="text-sm text-slate-600">{feature.description}</p>
+                <p className="text-sm text-muted">{feature.description}</p>
               </div>
             </div>
           ))}
         </div>
 
         {/* Don't show again */}
-        <label className="flex items-center gap-2 text-sm text-slate-600 mb-6 cursor-pointer">
+        <label className="flex items-center gap-2 text-sm text-muted mb-6 cursor-pointer">
           <input
             type="checkbox"
             checked={dontShowAgain}
             onChange={(e) => setDontShowAgain(e.target.checked)}
-            className="rounded border-slate-300 text-accent focus:ring-accent"
+            className="rounded border text-accent focus:ring-accent"
+            aria-label="Don't show this welcome message again"
           />
           Don&apos;t show this again
         </label>
@@ -117,9 +118,9 @@ export function WelcomeModal({ onDismiss }: WelcomeModalProps) {
         <button
           type="button"
           onClick={handleDismiss}
-          className="w-full px-6 py-3 bg-accent hover:bg-indigo-700 text-white rounded-lg font-medium
+          className="w-full px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-lg font-medium
             transition-all duration-150 ease-out active:scale-[0.98]
-            focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           Get Started
         </button>

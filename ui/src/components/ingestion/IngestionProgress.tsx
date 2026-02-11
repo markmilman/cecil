@@ -28,13 +28,13 @@ function formatElapsedTime(seconds: number): string {
 function getStatusBadge(status: ScanStatus): { label: string; className: string } {
   switch (status) {
     case ScanStatus.PENDING:
-      return { label: 'Pending', className: 'bg-slate-100 text-slate-700' };
+      return { label: 'Pending', className: 'bg-subtle text-primary' };
     case ScanStatus.RUNNING:
-      return { label: 'Running', className: 'bg-indigo-100 text-indigo-700' };
+      return { label: 'Running', className: 'bg-accent-light text-accent' };
     case ScanStatus.COMPLETED:
-      return { label: 'Completed', className: 'bg-emerald-100 text-emerald-700' };
+      return { label: 'Completed', className: 'bg-success-bg text-success' };
     case ScanStatus.FAILED:
-      return { label: 'Failed', className: 'bg-red-100 text-red-700' };
+      return { label: 'Failed', className: 'bg-danger-bg text-danger' };
   }
 }
 
@@ -43,16 +43,16 @@ function getStatusBadge(status: ScanStatus): { label: string; className: string 
  */
 function ShimmerSkeleton() {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-8 shadow-sm">
+    <div className="bg-card border rounded-lg p-8 shadow-sm">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <div className="h-6 w-24 rounded-full bg-slate-200 animate-shimmer" />
-          <div className="h-4 w-12 rounded bg-slate-200 animate-shimmer" />
+          <div className="h-6 w-24 rounded-full bg-skeleton animate-shimmer" />
+          <div className="h-4 w-12 rounded bg-skeleton animate-shimmer" />
         </div>
-        <div className="h-3 w-full rounded-full bg-slate-200 animate-shimmer" />
+        <div className="h-3 w-full rounded-full bg-skeleton animate-shimmer" />
         <div className="flex items-center justify-between">
-          <div className="h-4 w-40 rounded bg-slate-200 animate-shimmer" />
-          <div className="h-4 w-16 rounded bg-slate-200 animate-shimmer" />
+          <div className="h-4 w-40 rounded bg-skeleton animate-shimmer" />
+          <div className="h-4 w-16 rounded bg-skeleton animate-shimmer" />
         </div>
       </div>
     </div>
@@ -80,14 +80,14 @@ export function IngestionProgress({ progress, isConnected }: IngestionProgressPr
   const isTerminal = progress.status === ScanStatus.COMPLETED || progress.status === ScanStatus.FAILED;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
+    <div className="bg-card border rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
       {/* Header: Status badge + connection indicator */}
       <div className="flex items-center justify-between mb-4">
         <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusClass}`}>
           {statusLabel}
         </span>
         {!isTerminal && (
-          <span className={`text-xs font-medium ${isConnected ? 'text-emerald-600' : 'text-slate-500'}`}>
+          <span className={`text-xs font-medium ${isConnected ? 'text-success' : 'text-muted'}`}>
             {isConnected ? 'Live' : 'Polling'}
           </span>
         )}
@@ -100,14 +100,14 @@ export function IngestionProgress({ progress, isConnected }: IngestionProgressPr
         aria-valuenow={progress.percent_complete ?? undefined}
         aria-valuemin={0}
         aria-valuemax={100}
-        className="w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-4 shadow-sm"
+        className="w-full h-3 bg-subtle rounded-full overflow-hidden mb-4 shadow-sm"
       >
         {isIndeterminate && !isTerminal ? (
           <div className="h-full bg-accent rounded-full w-1/3 animate-progress-indeterminate" />
         ) : isTerminal && progress.status === ScanStatus.COMPLETED ? (
-          <div className="h-full bg-emerald-500 rounded-full w-full transition-all duration-500 ease-out" />
+          <div className="h-full bg-success rounded-full w-full transition-all duration-500 ease-out" />
         ) : isTerminal && progress.status === ScanStatus.FAILED ? (
-          <div className="h-full bg-red-500 rounded-full w-full" />
+          <div className="h-full bg-danger rounded-full w-full" />
         ) : (
           <div
             className="h-full bg-accent rounded-full transition-all duration-500 ease-out"
@@ -120,9 +120,9 @@ export function IngestionProgress({ progress, isConnected }: IngestionProgressPr
       <div className="flex items-center justify-between" aria-live="polite">
         <div className="text-sm text-primary">
           <span className="font-semibold">{progress.records_processed.toLocaleString()}</span>
-          <span className="text-slate-600"> records processed</span>
+          <span className="text-muted"> records processed</span>
         </div>
-        <div className="text-sm text-slate-600">
+        <div className="text-sm text-muted">
           {formatElapsedTime(progress.elapsed_seconds)}
         </div>
       </div>

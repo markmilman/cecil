@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
 import { Shell } from '@/components/common/Shell';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { WizardContainer } from '@/components/wizard/WizardContainer';
 
@@ -43,12 +44,14 @@ export function App() {
             boxSizing: 'border-box',
           }}
         >
-          {activeView === 'dashboard' && (
-            <DashboardPage onStartWizard={handleStartWizard} />
-          )}
-          {activeView === 'wizard' && (
-            <WizardContainer onBackToDashboard={handleBackToDashboard} />
-          )}
+          <ErrorBoundary key={activeView}>
+            {activeView === 'dashboard' && (
+              <DashboardPage onStartWizard={handleStartWizard} />
+            )}
+            {activeView === 'wizard' && (
+              <WizardContainer onBackToDashboard={handleBackToDashboard} />
+            )}
+          </ErrorBoundary>
         </div>
       </Shell>
     </ThemeProvider>
