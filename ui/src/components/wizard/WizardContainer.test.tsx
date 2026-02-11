@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { WizardContainer } from './WizardContainer';
-import { FileFormat } from '@/types';
+import { FileFormat, WizardStep, UploadedFileInfo } from '@/types';
+import { useState } from 'react';
 
 // Mock the apiClient
 vi.mock('@/lib/apiClient', () => ({
@@ -23,6 +24,22 @@ const MOCK_UPLOAD_RESPONSE = {
   errors: [],
 };
 
+// Test wrapper that manages wizard state like App.tsx does
+function WizardContainerWrapper(props: { onBackToDashboard?: () => void }) {
+  const [files, setFiles] = useState<UploadedFileInfo[]>([]);
+  const [step, setStep] = useState<WizardStep>(1);
+
+  return (
+    <WizardContainer
+      onBackToDashboard={props.onBackToDashboard || vi.fn()}
+      files={files}
+      onFilesChange={setFiles}
+      step={step}
+      onStepChange={setStep}
+    />
+  );
+}
+
 describe('WizardContainer', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -35,14 +52,14 @@ describe('WizardContainer', () => {
   });
 
   it('starts at step 1 with UploadZone', () => {
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
+    render(<WizardContainerWrapper />);
     expect(screen.getByText('File Ingestion')).toBeInTheDocument();
     expect(screen.getByText('Browse Files')).toBeInTheDocument();
   });
 
   it('advances to step 2 after file upload', async () => {
     vi.useRealTimers();
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
+    render(<WizardContainerWrapper />);
 
     // Simulate selecting files via the hidden input
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -57,7 +74,7 @@ describe('WizardContainer', () => {
 
   it('shows uploaded files in step 2', async () => {
     vi.useRealTimers();
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
+    render(<WizardContainerWrapper />);
 
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(['test'], 'test.jsonl', { type: 'application/json' });
@@ -72,7 +89,7 @@ describe('WizardContainer', () => {
 
   it('goes back to step 1 when Cancel is clicked in step 2', async () => {
     vi.useRealTimers();
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
+    render(<WizardContainerWrapper />);
 
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(['test'], 'test.jsonl', { type: 'application/json' });
@@ -88,7 +105,7 @@ describe('WizardContainer', () => {
 
   it('advances to step 3 (MappingConfigStep) when Next button is clicked', async () => {
     vi.useRealTimers();
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
+    render(<WizardContainerWrapper />);
 
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(['test'], 'test.jsonl', { type: 'application/json' });
@@ -104,7 +121,7 @@ describe('WizardContainer', () => {
 
   it('goes back to step 2 when Back is clicked in step 3', async () => {
     vi.useRealTimers();
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
+    render(<WizardContainerWrapper />);
 
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(['test'], 'test.jsonl', { type: 'application/json' });

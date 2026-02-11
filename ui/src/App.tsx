@@ -7,7 +7,7 @@ import { WizardContainer } from '@/components/wizard/WizardContainer';
 import { MappingPage } from '@/pages/MappingPage';
 import { IngestPage } from '@/pages/IngestPage';
 
-import type { ActiveView } from '@/types';
+import type { ActiveView, UploadedFileInfo, WizardStep } from '@/types';
 
 /**
  * Main App component
@@ -20,6 +20,8 @@ export function App() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [mappingSource, setMappingSource] = useState<string | null>(null);
   const [wizardMappingId, setWizardMappingId] = useState<string | null>(null);
+  const [wizardFiles, setWizardFiles] = useState<UploadedFileInfo[]>([]);
+  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
 
   const handleNavigate = useCallback((view: string) => {
     if (view === 'dashboard' || view === 'wizard' || view === 'mapping' || view === 'ingest') {
@@ -32,6 +34,9 @@ export function App() {
   }, []);
 
   const handleBackToDashboard = useCallback(() => {
+    setWizardFiles([]);
+    setWizardStep(1);
+    setWizardMappingId(null);
     setActiveView('dashboard');
   }, []);
 
@@ -77,6 +82,10 @@ export function App() {
                 onConfigureMapping={handleConfigureMapping}
                 initialMappingId={wizardMappingId}
                 onClearInitialMappingId={handleClearWizardMappingId}
+                files={wizardFiles}
+                onFilesChange={setWizardFiles}
+                step={wizardStep}
+                onStepChange={setWizardStep}
               />
             )}
             {activeView === 'mapping' && (

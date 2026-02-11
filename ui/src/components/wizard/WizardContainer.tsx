@@ -14,6 +14,10 @@ interface WizardContainerProps {
   onConfigureMapping?: (source: string) => void;
   initialMappingId?: string | null;
   onClearInitialMappingId?: () => void;
+  files: UploadedFileInfo[];
+  onFilesChange: (files: UploadedFileInfo[]) => void;
+  step: WizardStep;
+  onStepChange: (step: WizardStep) => void;
 }
 
 /**
@@ -35,9 +39,11 @@ export function WizardContainer({
   onConfigureMapping,
   initialMappingId,
   onClearInitialMappingId,
+  files,
+  onFilesChange,
+  step,
+  onStepChange,
 }: WizardContainerProps) {
-  const [step, setStep] = useState<WizardStep>(1);
-  const [files, setFiles] = useState<UploadedFileInfo[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [mappingId, setMappingId] = useState<string | null>(initialMappingId ?? null);
@@ -53,12 +59,12 @@ export function WizardContainer({
   useEffect(() => {
     if (initialMappingId) {
       setMappingId(initialMappingId);
-      if (files.length > 0 && step < 3) {
-        setStep(3);
+      if (files.length > 0) {
+        onStepChange(3);
       }
       onClearInitialMappingId?.();
     }
-  }, [initialMappingId, files.length, step, onClearInitialMappingId]);
+  }, [initialMappingId, files.length, onStepChange, onClearInitialMappingId]);
 
   const handleBrowseFiles = useCallback(async (fileList: FileList) => {
     setIsUploading(true);
@@ -67,8 +73,8 @@ export function WizardContainer({
       const selected = Array.from(fileList);
       const response = await apiClient.uploadFiles(selected);
       if (response.files.length > 0) {
-        setFiles(response.files);
-        setStep(2);
+        onFilesChange(response.files);
+        onStepChange(2);
       }
       if (response.errors.length > 0) {
         setUploadError(response.errors.join('; '));
@@ -78,26 +84,26 @@ export function WizardContainer({
     } finally {
       setIsUploading(false);
     }
-  }, []);
+  }, [onFilesChange, onStepChange]);
 
   const handleRemoveFile = useCallback((index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+    onFilesChange(files.filter((_, i) => i !== index));
+  }, [files, onFilesChange]);
 
   const handleCancel = useCallback(() => {
-    setFiles([]);
-    setStep(1);
-  }, []);
+    onFilesChange([]);
+    onStepChange(1);
+  }, [onFilesChange, onStepChange]);
 
   const handleSanitize = useCallback(() => {
-    setStep(3);
-  }, []);
+    onStepChange(3);
+  }, [onStepChange]);
 
   const handleMappingReady = useCallback((id: string, dir: string) => {
     setMappingId(id);
     setOutputDir(dir);
-    setStep(4);
-  }, []);
+    onStepChange(4);
+  }, [onStepChange]);
 
   const handleProcessingComplete = useCallback((result: {
     outputPath: string;
@@ -105,12 +111,12 @@ export function WizardContainer({
     recordsSanitized: number;
   }) => {
     setSanitizeResult(result);
-    setStep(5);
-  }, []);
+    onStepChange(5);
+  }, [onStepChange]);
 
   const handleStopProcess = useCallback(() => {
-    setStep(3);
-  }, []);
+    onStepChange(3);
+  }, [onStepChange]);
 
   const handleOpenFolder = useCallback(async () => {
     try {
@@ -143,14 +149,14 @@ export function WizardContainer({
           onRemoveFile={handleRemoveFile}
           onCancel={handleCancel}
           onSanitize={handleSanitize}
-          onBack={() => setStep(1)}
+          onBack={() => onStepChange(1)}
         />
       )}
       {step === 3 && (
         <MappingConfigStep
           files={files}
           onReady={handleMappingReady}
-          onBack={() => setStep(2)}
+          onBack={() => onStepChange(2)}
           onCreateMapping={(source) => onConfigureMapping?.(source)}
           initialMappingId={mappingId}
         />
@@ -173,7 +179,7 @@ export function WizardContainer({
           onBackToDashboard={onBackToDashboard}
           onOpenFolder={handleOpenFolder}
           onGetReport={handleGetReport}
-          onBack={() => setStep(3)}
+          onBack={() => onStepChange(3)}
         />
       )}
     </div>
