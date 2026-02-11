@@ -305,12 +305,31 @@ def _execute_sanitize(
         state.records_processed = engine.records_processed
         state.records_sanitized = engine.records_sanitized
         state.records_failed = engine.records_failed
+        logger.info(
+            "Sanitization completed",
+            extra={
+                "scan_id": scan_id,
+                "records_processed": state.records_processed,
+                "records_sanitized": state.records_sanitized,
+                "records_failed": state.records_failed,
+            },
+        )
     except CecilError as err:
         state.status = ScanStatus.FAILED
-        state.errors.append(type(err).__name__)
+        error_msg = f"{type(err).__name__}: {err}"
+        state.errors.append(error_msg)
+        logger.error(
+            "Sanitization failed with CecilError",
+            extra={"scan_id": scan_id, "error_type": type(err).__name__, "error": str(err)},
+        )
     except Exception as err:
         state.status = ScanStatus.FAILED
-        state.errors.append(type(err).__name__)
+        error_msg = f"{type(err).__name__}: {err}"
+        state.errors.append(error_msg)
+        logger.error(
+            "Sanitization failed with unexpected error",
+            extra={"scan_id": scan_id, "error_type": type(err).__name__, "error": str(err)},
+        )
     finally:
         writer.close()
         provider.close()
@@ -353,8 +372,8 @@ async def sanitize(
             ).model_dump(),
         )
 
-    # Validate source file.
-    resolved = Path(request.source).resolve()
+    # Validate source file (expand tilde).
+    resolved = Path(request.source).expanduser().resolve()
     if not resolved.is_file():
         return JSONResponse(
             status_code=404,
@@ -381,7 +400,8 @@ async def sanitize(
         mapping_config = mapping_state.config
     elif request.mapping_yaml_path:
         try:
-            mapping_config = MappingParser().parse_file(request.mapping_yaml_path)
+            yaml_path = Path(request.mapping_yaml_path).expanduser().resolve()
+            mapping_config = MappingParser().parse_file(yaml_path)
         except CecilError as err:
             return JSONResponse(
                 status_code=422,
@@ -411,8 +431,8 @@ async def sanitize(
             ).model_dump(),
         )
 
-    # Build output path.
-    output_dir = Path(request.output_dir)
+    # Build output path (expand tilde).
+    output_dir = Path(request.output_dir).expanduser().resolve()
     output_path = output_dir / f"{resolved.stem}_sanitized.jsonl"
 
     # Ensure output directory exists.
