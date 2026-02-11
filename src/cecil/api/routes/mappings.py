@@ -380,7 +380,7 @@ async def load_mapping_yaml(
         A MappingConfigResponse with the loaded mapping, or an
         error response if the file is missing or invalid.
     """
-    resolved = Path(request.path).resolve()
+    resolved = Path(request.path).expanduser().resolve()
     if not resolved.is_file():
         return JSONResponse(
             status_code=404,

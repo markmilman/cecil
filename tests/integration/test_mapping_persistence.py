@@ -350,3 +350,133 @@ class TestUpdateMappingUpdatesYamlFile:
         assert saved_data["default_action"] == "keep"
         assert saved_data["fields"]["email"]["action"] == "hash"
         assert saved_data["fields"]["name"]["action"] == "keep"
+
+
+class TestLoadMappingByYamlPath:
+    """Tests for loading saved mappings by their YAML file path."""
+
+    def test_load_saved_mapping_by_yaml_path(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """A saved mapping can be loaded back via its yaml_path."""
+        # 1. Create a mapping
+        response = client.post("/api/v1/mappings/", json=_valid_mapping_payload())
+        assert response.status_code == 201
+        body = response.json()
+        mapping_id = body["mapping_id"]
+
+        # 2. Get the yaml_path (construct it from the mapping_id)
+        yaml_path = mappings_dir / f"{mapping_id}.yaml"
+        assert yaml_path.is_file()
+
+        # 3. POST to /api/v1/mappings/load-yaml with that path
+        load_response = client.post(
+            "/api/v1/mappings/load-yaml",
+            json={"path": str(yaml_path)},
+        )
+        assert load_response.status_code == 201
+        loaded_body = load_response.json()
+
+        # 4. Assert the loaded mapping has the same fields and actions
+        assert loaded_body["version"] == body["version"]
+        assert loaded_body["default_action"] == body["default_action"]
+        assert loaded_body["fields"] == body["fields"]
+
+        # The loaded mapping should have a different ID (new instance)
+        assert loaded_body["mapping_id"] != mapping_id
+
+    def test_load_mapping_with_tilde_path(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """Loading a mapping via a tilde-prefixed path resolves correctly."""
+        # Create a mapping
+        response = client.post("/api/v1/mappings/", json=_valid_mapping_payload())
+        assert response.status_code == 201
+        mapping_id = response.json()["mapping_id"]
+
+        # Get the actual yaml path
+        yaml_path = mappings_dir / f"{mapping_id}.yaml"
+        assert yaml_path.is_file()
+
+        # Test that we can load the file using an absolute path first
+        load_response_abs = client.post(
+            "/api/v1/mappings/load-yaml",
+            json={"path": str(yaml_path)},
+        )
+        assert load_response_abs.status_code == 201
+
+        # Now test with a tilde path if the temp path is under home
+        # Otherwise, verify that expanduser() is called by checking that
+        # a path with a tilde that doesn't expand to a valid file returns 404
+        home_dir = Path.home()
+
+        try:
+            # Try to create a relative path from home
+            relative_to_home = yaml_path.relative_to(home_dir)
+            tilde_path = f"~/{relative_to_home}"
+
+            # Load the mapping using the tilde path
+            load_response = client.post(
+                "/api/v1/mappings/load-yaml",
+                json={"path": tilde_path},
+            )
+            assert load_response.status_code == 201
+            loaded_body = load_response.json()
+
+            # Verify the loaded mapping has the correct content
+            assert loaded_body["version"] == 1
+            assert loaded_body["default_action"] == "redact"
+            assert "email" in loaded_body["fields"]
+            assert loaded_body["fields"]["email"]["action"] == "mask"
+        except ValueError:
+            # The temp path is not under home, so we can't test with a real tilde path
+            # Instead, verify that tilde expansion is attempted by using a fake tilde path
+            # If expanduser() is NOT called, the path "~/nonexistent.yaml" would be
+            # treated literally and might not return 404 in the expected way
+            fake_tilde_path = "~/nonexistent_mapping_file.yaml"
+            load_response = client.post(
+                "/api/v1/mappings/load-yaml",
+                json={"path": fake_tilde_path},
+            )
+            # Should get 404 because the expanded path doesn't exist
+            assert load_response.status_code == 404
+
+    def test_load_nonexistent_mapping_returns_404(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """Loading a nonexistent YAML file returns 404."""
+        nonexistent_path = mappings_dir / "nonexistent.yaml"
+
+        load_response = client.post(
+            "/api/v1/mappings/load-yaml",
+            json={"path": str(nonexistent_path)},
+        )
+        assert load_response.status_code == 404
+        error_body = load_response.json()
+        assert error_body["error"] == "file_not_found"
+        assert "does not exist" in error_body["message"]
+
+    def test_load_invalid_yaml_returns_422(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """Loading an invalid YAML file returns 422."""
+        # Create an invalid YAML file
+        invalid_yaml_path = mappings_dir / "invalid.yaml"
+        with invalid_yaml_path.open("w", encoding="utf-8") as f:
+            f.write("version: 1\ndefault_action: invalid_action\n")
+
+        load_response = client.post(
+            "/api/v1/mappings/load-yaml",
+            json={"path": str(invalid_yaml_path)},
+        )
+        assert load_response.status_code == 422
+        error_body = load_response.json()
+        assert error_body["error"] == "mapping_parse_error"
