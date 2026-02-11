@@ -122,6 +122,12 @@ export function WizardContainer({
     }
   }, [sanitizeResult, outputDir]);
 
+  const handleGetReport = useCallback(() => {
+    // TODO: Implement SaaS lead capture flow (US.10)
+    // For now, show a placeholder message
+    alert('Cost analysis reports coming soon! This feature will allow you to receive detailed cost insights and optimization recommendations.');
+  }, []);
+
   return (
     <div key={step} className="animate-fade-in">
       {step === 1 && (
@@ -165,6 +171,7 @@ export function WizardContainer({
           recordsSanitized={sanitizeResult?.recordsSanitized}
           onBackToDashboard={onBackToDashboard}
           onOpenFolder={handleOpenFolder}
+          onGetReport={handleGetReport}
         />
       )}
     </div>
