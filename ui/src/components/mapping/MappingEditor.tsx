@@ -7,7 +7,7 @@
  */
 
 import { useEffect } from 'react';
-import { ArrowLeftIcon, AlertCircleIcon } from 'lucide-react';
+import { ArrowLeftIcon, AlertCircleIcon, Loader2Icon } from 'lucide-react';
 import { useMapping } from '@/hooks/useMapping';
 import { MappingToolbar } from './MappingToolbar';
 import { FieldMappingTable } from './FieldMappingTable';
@@ -49,17 +49,11 @@ export function MappingEditor({ source, onBackToDashboard, onMappingComplete }: 
 
   if (isLoading) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '80px 0',
-          color: 'var(--text-secondary)',
-          fontSize: '14px',
-        }}
-      >
-        Loading sample record...
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2Icon className="h-8 w-8 text-indigo-600 animate-spin mb-3" />
+        <p className="text-sm text-slate-500">
+          Loading sample record from <span className="font-medium text-slate-700">{source}</span>...
+        </p>
       </div>
     );
   }
