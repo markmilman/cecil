@@ -6,7 +6,7 @@
  * and optional validation/preview panels.
  */
 
-import { ArrowLeftIcon, AlertCircleIcon, Loader2Icon } from 'lucide-react';
+import { ArrowLeftIcon, AlertCircleIcon, Loader2Icon, ArrowRightIcon } from 'lucide-react';
 import { useMapping } from '@/hooks/useMapping';
 import { MappingToolbar } from './MappingToolbar';
 import { FieldMappingTable } from './FieldMappingTable';
@@ -115,7 +115,7 @@ export function MappingEditor({ source, onBackToDashboard, onMappingComplete }: 
       {/* Success banner */}
       {savedMappingId && (
         <div
-          className="flex items-center gap-2"
+          className="flex items-center justify-between"
           style={{
             padding: '12px 16px',
             backgroundColor: 'var(--success-bg)',
@@ -126,7 +126,22 @@ export function MappingEditor({ source, onBackToDashboard, onMappingComplete }: 
             fontSize: '14px',
           }}
         >
-          Mapping saved successfully.
+          <span>Mapping saved successfully.</span>
+          {onMappingComplete && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => onMappingComplete(savedMappingId)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              Save &amp; Continue
+              <ArrowRightIcon className="h-4 w-4" />
+            </button>
+          )}
         </div>
       )}
 
