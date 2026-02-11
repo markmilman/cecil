@@ -58,6 +58,8 @@ export function IngestPage({ onViewResults }: IngestPageProps) {
         // Auto-detect format from the first file if not already set
         if (!fileFormat && response.files[0].format) {
           setFileFormat(response.files[0].format as FileFormat);
+        } else if (!fileFormat && !response.files[0].format) {
+          setUploadError('Could not detect file format. Please select one manually.');
         }
       }
       if (response.errors.length > 0) {
@@ -206,13 +208,13 @@ export function IngestPage({ onViewResults }: IngestPageProps) {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isSubmitting || isScanning || uploadedFiles.length === 0}
+                disabled={isSubmitting || isScanning || uploadedFiles.length === 0 || !fileFormat}
                 className={`
                   px-6 py-3 rounded-lg font-medium
                   transition-all duration-150 ease-out
                   focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent
                   active:scale-[0.98]
-                  ${isSubmitting || isScanning || uploadedFiles.length === 0
+                  ${isSubmitting || isScanning || uploadedFiles.length === 0 || !fileFormat
                     ? 'bg-skeleton text-muted cursor-not-allowed'
                     : 'bg-accent hover:bg-accent-hover text-white'
                   }
