@@ -404,6 +404,18 @@ async def sanitize(
     output_dir = Path(request.output_dir)
     output_path = output_dir / f"{resolved.stem}_sanitized.jsonl"
 
+    # Ensure output directory exists.
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as err:
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="output_dir_error",
+                message=f"Cannot create output directory: {err}",
+            ).model_dump(),
+        )
+
     # Create scan state.
     scan_id = str(uuid4())
     state = ScanState(

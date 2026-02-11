@@ -6,7 +6,7 @@
  * Top-level views rendered in the main content area.
  * The app uses state-driven view switching rather than a router.
  */
-export type ActiveView = 'dashboard' | 'wizard' | 'mapping';
+export type ActiveView = 'dashboard' | 'wizard' | 'mapping' | 'ingest';
 
 /**
  * Steps within the ingestion wizard flow.

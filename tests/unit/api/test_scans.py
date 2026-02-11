@@ -566,3 +566,37 @@ class TestSanitize:
         # 'id' is KEEP, should be unchanged; 'data' is REDACT, should be replaced.
         assert record["id"] == 0
         assert "REDACTED" in record["data"]
+
+    def test_sanitize_creates_output_directory(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Sanitization creates the output directory if it doesn't exist.
+
+        When output_dir points to a non-existent directory, the endpoint
+        should create it automatically before queuing the background task.
+        """
+        jsonl_file = _create_jsonl_file(tmp_path, records=2)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "nonexistent" / "nested" / "output"
+
+        # Verify the directory doesn't exist before the request.
+        assert not output_dir.exists()
+
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+
+        assert response.status_code == 201
+        # Verify the directory was created.
+        assert output_dir.exists()
+        assert output_dir.is_dir()
+        # Verify the output file was written successfully.
+        output_path = Path(response.json()["output_path"])
+        assert output_path.is_file()
