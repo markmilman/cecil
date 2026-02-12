@@ -17,7 +17,7 @@ export function AuditPage() {
             <FileSearchIcon className="h-8 w-8 text-accent" />
             <h1 className="text-3xl font-extrabold text-primary">Audit View</h1>
           </div>
-          <p className="text-slate-600 leading-relaxed">
+          <p className="text-muted leading-relaxed">
             Review sanitization results and redaction previews
           </p>
         </div>

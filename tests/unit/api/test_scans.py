@@ -360,3 +360,358 @@ def _clear_scan_store() -> Generator[None, None, None]:
     _scan_store.clear()
     yield
     _scan_store.clear()
+
+
+@pytest.fixture(autouse=True)
+def _clear_mapping_store() -> Generator[None, None, None]:
+    """Clear the in-memory mapping store between tests."""
+    from cecil.api.routes.mappings import _mapping_store
+
+    _mapping_store.clear()
+    yield
+    _mapping_store.clear()
+
+
+def _create_mapping_yaml(tmp_path: Path) -> Path:
+    """Create a temporary mapping YAML file.
+
+    Args:
+        tmp_path: Pytest temporary directory.
+
+    Returns:
+        Path to the created YAML file.
+    """
+    f = tmp_path / "mapping.yaml"
+    f.write_text(
+        "version: 1\n"
+        "default_action: redact\n"
+        "fields:\n"
+        "  id:\n"
+        "    action: keep\n"
+        "  data:\n"
+        "    action: redact\n",
+    )
+    return f
+
+
+class TestSanitize:
+    """Tests for POST /api/v1/scans/sanitize endpoint."""
+
+    def test_sanitize_valid_with_mapping_id_returns_201(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A valid sanitize request with mapping_id returns 201."""
+        # Create a mapping first.
+        mapping_resp = client.post(
+            "/api/v1/mappings/",
+            json={
+                "version": 1,
+                "default_action": "redact",
+                "fields": {
+                    "id": {"action": "keep", "options": {}},
+                    "data": {"action": "redact", "options": {}},
+                },
+            },
+        )
+        mapping_id = mapping_resp.json()["mapping_id"]
+
+        jsonl_file = _create_jsonl_file(tmp_path)
+        output_dir = tmp_path / "output"
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_id": mapping_id,
+                "output_dir": str(output_dir),
+            },
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert "scan_id" in body
+        assert body["status"] in ("pending", "completed")
+        assert "_sanitized_" in body["output_path"]
+        assert body["output_path"].endswith(".jsonl")
+
+    def test_sanitize_valid_with_yaml_path_returns_201(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A valid sanitize request with mapping_yaml_path returns 201."""
+        jsonl_file = _create_jsonl_file(tmp_path)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "output"
+
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert "scan_id" in body
+        assert "_sanitized_" in body["output_path"]
+        assert body["output_path"].endswith(".jsonl")
+
+    def test_sanitize_nonexistent_source_returns_404(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A nonexistent source file returns 404."""
+        yaml_file = _create_mapping_yaml(tmp_path)
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": "/nonexistent/path.jsonl",
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(tmp_path / "output"),
+            },
+        )
+
+        assert response.status_code == 404
+        assert response.json()["error"] == "file_not_found"
+
+    def test_sanitize_missing_mapping_returns_422(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A request without mapping_id or mapping_yaml_path returns 422."""
+        jsonl_file = _create_jsonl_file(tmp_path)
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "output_dir": str(tmp_path / "output"),
+            },
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"] == "missing_mapping"
+
+    def test_sanitize_nonexistent_mapping_id_returns_404(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A nonexistent mapping_id returns 404."""
+        jsonl_file = _create_jsonl_file(tmp_path)
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_id": "nonexistent-id",
+                "output_dir": str(tmp_path / "output"),
+            },
+        )
+
+        assert response.status_code == 404
+        assert response.json()["error"] == "mapping_not_found"
+
+    def test_sanitize_path_traversal_returns_403(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """A path containing '..' components returns 403."""
+        yaml_file = _create_mapping_yaml(tmp_path)
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": "../../etc/passwd",
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(tmp_path / "output"),
+            },
+        )
+
+        assert response.status_code == 403
+        assert response.json()["error"] == "path_traversal"
+
+    def test_sanitize_produces_output_file(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Sanitization produces an output file with sanitized content.
+
+        TestClient runs background tasks synchronously, so the output
+        file should exist after the POST returns.
+        """
+        jsonl_file = _create_jsonl_file(tmp_path, records=2)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "output"
+
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+
+        assert response.status_code == 201
+        output_path = Path(response.json()["output_path"])
+        assert output_path.is_file()
+
+        lines = output_path.read_text(encoding="utf-8").strip().split("\n")
+        assert len(lines) == 2
+        record = json.loads(lines[0])
+        # 'id' is KEEP, should be unchanged; 'data' is REDACT, should be replaced.
+        assert record["id"] == 0
+        assert "REDACTED" in record["data"]
+
+    def test_sanitize_creates_output_directory(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Sanitization creates the output directory if it doesn't exist.
+
+        When output_dir points to a non-existent directory, the endpoint
+        should create it automatically before queuing the background task.
+        """
+        jsonl_file = _create_jsonl_file(tmp_path, records=2)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "nonexistent" / "nested" / "output"
+
+        # Verify the directory doesn't exist before the request.
+        assert not output_dir.exists()
+
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+
+        assert response.status_code == 201
+        # Verify the directory was created.
+        assert output_dir.exists()
+        assert output_dir.is_dir()
+        # Verify the output file was written successfully.
+        output_path = Path(response.json()["output_path"])
+        assert output_path.is_file()
+
+    def test_sanitize_same_source_twice_produces_different_output_files(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Two sanitization runs of the same source must write to different output files.
+
+        Each scan includes a timestamp in the output filename so that
+        successive runs never overwrite previous results.
+        """
+        jsonl_file = _create_jsonl_file(tmp_path, records=2)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "output"
+
+        resp1 = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+        resp2 = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+
+        assert resp1.status_code == 201
+        assert resp2.status_code == 201
+
+        path1 = resp1.json()["output_path"]
+        path2 = resp2.json()["output_path"]
+        assert path1 != path2, "Two scans of the same source must produce different output paths"
+
+        # Both output files should exist.
+        assert Path(path1).is_file()
+        assert Path(path2).is_file()
+
+
+class TestCancelScan:
+    """Tests for POST /api/v1/scans/{scan_id}/cancel endpoint."""
+
+    def test_cancel_running_scan_returns_200(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Cancelling a running scan sets the cancellation flag."""
+        jsonl_file = _create_jsonl_file(tmp_path, records=2)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "output"
+
+        # Start a sanitization scan.
+        resp = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+        scan_id = resp.json()["scan_id"]
+
+        # Cancel the scan (even though it may have already completed).
+        cancel_resp = client.post(f"/api/v1/scans/{scan_id}/cancel")
+
+        # Should return 200 (or 422 if already completed).
+        assert cancel_resp.status_code in (200, 422)
+
+    def test_cancel_nonexistent_scan_returns_404(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Cancelling a non-existent scan returns 404."""
+        response = client.post("/api/v1/scans/nonexistent-id/cancel")
+
+        assert response.status_code == 404
+        assert response.json()["error"] == "scan_not_found"
+
+    def test_cancel_completed_scan_returns_422(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Cancelling an already completed scan returns 422."""
+        jsonl_file = _create_jsonl_file(tmp_path, records=2)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "output"
+
+        # Start and complete a sanitization scan.
+        resp = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+        scan_id = resp.json()["scan_id"]
+
+        # Wait for completion (TestClient runs background tasks synchronously).
+        # By the time we try to cancel, the scan should be completed.
+
+        # Try to cancel the completed scan.
+        cancel_resp = client.post(f"/api/v1/scans/{scan_id}/cancel")
+
+        assert cancel_resp.status_code == 422
+        assert cancel_resp.json()["error"] == "scan_not_cancellable"

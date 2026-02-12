@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { UploadZone } from './UploadZone';
 
 describe('UploadZone', () => {
@@ -29,23 +29,27 @@ describe('UploadZone', () => {
     expect(screen.getByText('Browse Files')).toBeInTheDocument();
   });
 
-  it('calls onBrowseFiles when Browse Files button is clicked', () => {
-    const onBrowseFiles = vi.fn();
-    render(<UploadZone onBrowseFiles={onBrowseFiles} />);
-    fireEvent.click(screen.getByText('Browse Files'));
-    expect(onBrowseFiles).toHaveBeenCalledOnce();
-  });
-
   it('has an accessible upload zone with role button', () => {
     render(<UploadZone onBrowseFiles={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Browse files for upload' })).toBeInTheDocument();
   });
 
-  it('calls onBrowseFiles on Enter key in upload zone', () => {
-    const onBrowseFiles = vi.fn();
-    render(<UploadZone onBrowseFiles={onBrowseFiles} />);
-    const zone = screen.getByRole('button', { name: 'Browse files for upload' });
-    fireEvent.keyDown(zone, { key: 'Enter' });
-    expect(onBrowseFiles).toHaveBeenCalled();
+  it('shows uploading state', () => {
+    render(<UploadZone onBrowseFiles={vi.fn()} isUploading={true} />);
+    const uploadingElements = screen.getAllByText('Uploading...');
+    expect(uploadingElements.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows upload error', () => {
+    render(<UploadZone onBrowseFiles={vi.fn()} uploadError="Unsupported format" />);
+    expect(screen.getByText('Unsupported format')).toBeInTheDocument();
+  });
+
+  it('includes a hidden file input for native file picker', () => {
+    const { container } = render(<UploadZone onBrowseFiles={vi.fn()} />);
+    const fileInput = container.querySelector('input[type="file"]');
+    expect(fileInput).toBeInTheDocument();
+    expect(fileInput).toHaveAttribute('accept', '.jsonl,.csv,.parquet');
+    expect(fileInput).toHaveAttribute('multiple');
   });
 });

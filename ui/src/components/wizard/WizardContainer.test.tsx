@@ -1,63 +1,140 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { WizardContainer } from './WizardContainer';
+import { FileFormat, WizardStep, UploadedFileInfo } from '@/types';
+import { useState } from 'react';
+
+// Mock the apiClient
+vi.mock('@/lib/apiClient', () => ({
+  apiClient: {
+    uploadFiles: vi.fn(),
+    loadMappingYaml: vi.fn(),
+    sanitize: vi.fn(),
+  },
+}));
+
+// Import after mock setup
+import { apiClient } from '@/lib/apiClient';
+
+const MOCK_UPLOAD_RESPONSE = {
+  files: [
+    { name: 'app-logs-prod.jsonl', path: '/tmp/uploads/app-logs-prod.jsonl', size: 2516582, format: FileFormat.JSONL },
+    { name: 'api-requests-2024.csv', path: '/tmp/uploads/api-requests-2024.csv', size: 911360, format: FileFormat.CSV },
+  ],
+  errors: [],
+};
+
+// Test wrapper that manages wizard state like App.tsx does
+function WizardContainerWrapper(props: { onBackToDashboard?: () => void }) {
+  const [files, setFiles] = useState<UploadedFileInfo[]>([]);
+  const [step, setStep] = useState<WizardStep>(1);
+
+  return (
+    <WizardContainer
+      onBackToDashboard={props.onBackToDashboard || vi.fn()}
+      files={files}
+      onFilesChange={setFiles}
+      step={step}
+      onStepChange={setStep}
+    />
+  );
+}
 
 describe('WizardContainer', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.mocked(apiClient.uploadFiles).mockResolvedValue(MOCK_UPLOAD_RESPONSE);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.clearAllMocks();
   });
 
   it('starts at step 1 with UploadZone', () => {
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
+    render(<WizardContainerWrapper />);
     expect(screen.getByText('File Ingestion')).toBeInTheDocument();
     expect(screen.getByText('Browse Files')).toBeInTheDocument();
   });
 
-  it('advances to step 2 when Browse Files is clicked', () => {
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
-    fireEvent.click(screen.getByText('Browse Files'));
-    expect(screen.getByText('Queued Files')).toBeInTheDocument();
+  it('advances to step 2 after file upload', async () => {
+    vi.useRealTimers();
+    render(<WizardContainerWrapper />);
+
+    // Simulate selecting files via the hidden input
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['test content'], 'test.jsonl', { type: 'application/json' });
+    Object.defineProperty(fileInput, 'files', { value: [file], configurable: true });
+    fireEvent.change(fileInput);
+
+    await waitFor(() => {
+      expect(screen.getByText('Queued Files')).toBeInTheDocument();
+    });
   });
 
-  it('shows mock files in step 2 after browsing', () => {
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
-    fireEvent.click(screen.getByText('Browse Files'));
-    expect(screen.getByText('app-logs-prod.jsonl')).toBeInTheDocument();
-    expect(screen.getByText('api-requests-2024.csv')).toBeInTheDocument();
-    expect(screen.getByText('user-sessions.parquet')).toBeInTheDocument();
+  it('shows uploaded files in step 2', async () => {
+    vi.useRealTimers();
+    render(<WizardContainerWrapper />);
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['test'], 'test.jsonl', { type: 'application/json' });
+    Object.defineProperty(fileInput, 'files', { value: [file], configurable: true });
+    fireEvent.change(fileInput);
+
+    await waitFor(() => {
+      expect(screen.getByText('app-logs-prod.jsonl')).toBeInTheDocument();
+      expect(screen.getByText('api-requests-2024.csv')).toBeInTheDocument();
+    });
   });
 
-  it('goes back to step 1 when Cancel is clicked in step 2', () => {
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
-    fireEvent.click(screen.getByText('Browse Files'));
+  it('goes back to step 1 when Cancel is clicked in step 2', async () => {
+    vi.useRealTimers();
+    render(<WizardContainerWrapper />);
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['test'], 'test.jsonl', { type: 'application/json' });
+    Object.defineProperty(fileInput, 'files', { value: [file], configurable: true });
+    fireEvent.change(fileInput);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cancel')).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.getByText('File Ingestion')).toBeInTheDocument();
   });
 
-  it('removes a file from the queue', () => {
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
-    fireEvent.click(screen.getByText('Browse Files'));
-    fireEvent.click(screen.getByRole('button', { name: 'Remove app-logs-prod.jsonl' }));
-    expect(screen.queryByText('app-logs-prod.jsonl')).not.toBeInTheDocument();
-    expect(screen.getByText('2 Files selected for sanitization.')).toBeInTheDocument();
+  it('advances to step 3 (MappingConfigStep) when Next button is clicked', async () => {
+    vi.useRealTimers();
+    render(<WizardContainerWrapper />);
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['test'], 'test.jsonl', { type: 'application/json' });
+    Object.defineProperty(fileInput, 'files', { value: [file], configurable: true });
+    fireEvent.change(fileInput);
+
+    await waitFor(() => {
+      expect(screen.getByText('Next: Configure Mapping')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Next: Configure Mapping'));
+    expect(screen.getByText('Configure Mapping')).toBeInTheDocument();
   });
 
-  it('advances to step 3 when Sanitize button is clicked', () => {
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
-    fireEvent.click(screen.getByText('Browse Files'));
-    fireEvent.click(screen.getByText('Sanitize 3 Files'));
-    expect(screen.getByText('Sanitizing Files...')).toBeInTheDocument();
-  });
+  it('goes back to step 2 when Back is clicked in step 3', async () => {
+    vi.useRealTimers();
+    render(<WizardContainerWrapper />);
 
-  it('goes back to step 2 when Stop Process is clicked in step 3', () => {
-    render(<WizardContainer onBackToDashboard={vi.fn()} />);
-    fireEvent.click(screen.getByText('Browse Files'));
-    fireEvent.click(screen.getByText('Sanitize 3 Files'));
-    fireEvent.click(screen.getByText('Stop Process'));
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['test'], 'test.jsonl', { type: 'application/json' });
+    Object.defineProperty(fileInput, 'files', { value: [file], configurable: true });
+    fireEvent.change(fileInput);
+
+    await waitFor(() => {
+      expect(screen.getByText('Next: Configure Mapping')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Next: Configure Mapping'));
+    expect(screen.getByText('Configure Mapping')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Back'));
     expect(screen.getByText('Queued Files')).toBeInTheDocument();
   });
 });

@@ -3,11 +3,12 @@ import { render, screen } from '@testing-library/react';
 import { IngestPage } from './IngestPage';
 import { getErrorMessage } from '@/lib/errorMessages';
 
-// Mock the FileBrowserModal to avoid API calls
-vi.mock('@/components/ingestion/FileBrowserModal', () => ({
-  FileBrowserModal: ({ isOpen }: { isOpen: boolean }) => {
-    if (!isOpen) return null;
-    return <div data-testid="file-browser-modal" />;
+// Mock the apiClient to avoid real network calls
+vi.mock('@/lib/apiClient', () => ({
+  apiClient: {
+    uploadFiles: vi.fn(),
+    createScan: vi.fn(),
+    getScan: vi.fn(),
   },
 }));
 
@@ -24,7 +25,7 @@ describe('IngestPage', () => {
 
   it('renders the file picker empty state heading', () => {
     render(<IngestPage />);
-    expect(screen.getByText('Select a Data File to Get Started')).toBeInTheDocument();
+    expect(screen.getByText('Select Data Files to Get Started')).toBeInTheDocument();
   });
 
   it('renders the format selector', () => {
@@ -37,7 +38,7 @@ describe('IngestPage', () => {
     expect(screen.getByText('Start Scan')).toBeInTheDocument();
   });
 
-  it('disables submit button when no file is selected', () => {
+  it('disables submit button when no files are uploaded', () => {
     render(<IngestPage />);
     expect(screen.getByText('Start Scan')).toBeDisabled();
   });

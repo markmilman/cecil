@@ -24,29 +24,29 @@ export function EmptyState({
   onAction,
 }: EmptyStateProps) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-12 shadow-sm">
+    <div className="bg-card border rounded-xl p-12 shadow-sm">
       <div className="flex flex-col items-center text-center">
         {/* Circular icon badge */}
-        <div className="h-20 w-20 rounded-full bg-indigo-50 flex items-center justify-center mb-6">
-          <div className="h-10 w-10 text-indigo-600 [&>svg]:h-full [&>svg]:w-full">
+        <div className="h-20 w-20 rounded-full bg-accent-light flex items-center justify-center mb-6">
+          <div className="h-10 w-10 text-accent [&>svg]:h-full [&>svg]:w-full">
             {icon}
           </div>
         </div>
 
         {/* Heading */}
-        <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+        <h2 className="text-xl font-semibold text-primary">{title}</h2>
 
         {/* Description */}
-        <p className="text-slate-600 mt-2 max-w-md leading-relaxed">{description}</p>
+        <p className="text-muted mt-2 max-w-md leading-relaxed">{description}</p>
 
         {/* CTA */}
         {actionLabel && onAction && (
           <button
             type="button"
             onClick={onAction}
-            className="mt-6 px-6 py-3 bg-accent hover:bg-indigo-700 text-white rounded-lg font-medium
+            className="mt-6 px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-lg font-medium
               transition-all duration-150 ease-out active:scale-[0.98]
-              focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             {actionLabel}
           </button>

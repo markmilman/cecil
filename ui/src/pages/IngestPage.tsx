@@ -7,20 +7,24 @@ import { IngestionProgress } from '@/components/ingestion/IngestionProgress';
 import { useScanProgress } from '@/hooks/useScanProgress';
 import { apiClient } from '@/lib/apiClient';
 import { getErrorMessage } from '@/lib/errorMessages';
-import type { FileFormat } from '@/types';
-import type { SelectedFile } from '@/components/ingestion/FilePickerCard';
-import type { FileSelectionMetadata } from '@/components/ingestion/FileBrowserModal';
+import type { FileFormat, UploadedFileInfo } from '@/types';
 import { ScanStatus } from '@/types';
+
+interface IngestPageProps {
+  onViewResults?: (source: string, scanId: string) => void;
+}
 
 /**
  * IngestPage component
  *
- * Main page for file ingestion. Users select a local data file and optional format,
- * then initiate a scan. Real-time progress is displayed via WebSocket connection.
- * Includes success/error flows and navigation guards (#62).
+ * Main page for file ingestion. Users upload local data files via the browser's
+ * native file picker, then initiate a scan. Real-time progress is displayed
+ * via WebSocket connection.
  */
-export function IngestPage() {
-  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
+export function IngestPage({ onViewResults }: IngestPageProps) {
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileInfo[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [fileFormat, setFileFormat] = useState<FileFormat | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,26 +47,44 @@ export function IngestPage() {
     }
   };
 
-  const handleFileSelect = (_path: string, metadata: FileSelectionMetadata) => {
-    setSelectedFile({
-      path: _path,
-      name: metadata.name,
-      size: metadata.size,
-      format: metadata.format,
-    });
-    // Auto-detect format from metadata if available
-    if (metadata.format) {
-      setFileFormat(metadata.format as FileFormat);
+  const handleBrowseClick = async (fileList: FileList) => {
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const files = Array.from(fileList);
+      const response = await apiClient.uploadFiles(files);
+      if (response.files.length > 0) {
+        setUploadedFiles((prev) => [...prev, ...response.files]);
+        // Auto-detect format from the first file if not already set
+        if (!fileFormat && response.files[0].format) {
+          setFileFormat(response.files[0].format as FileFormat);
+        } else if (!fileFormat && !response.files[0].format) {
+          setUploadError('Could not detect file format. Please select one manually.');
+        }
+      }
+      if (response.errors.length > 0) {
+        setUploadError(response.errors.join('; '));
+      }
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Failed to upload files');
+    } finally {
+      setIsUploading(false);
     }
   };
 
+  const handleRemoveFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async () => {
-    if (!selectedFile) return;
+    if (uploadedFiles.length === 0) return;
     setIsSubmitting(true);
     setError(null);
     try {
+      // Scan the first uploaded file (multi-file scan support can be added later)
+      const file = uploadedFiles[0];
       const response = await apiClient.createScan({
-        source: selectedFile.path,
+        source: file.path,
         file_format: fileFormat,
       });
       setScanId(response.scan_id);
@@ -100,17 +122,24 @@ export function IngestPage() {
   // Handler: reset state for a new scan
   const handleNewScan = () => {
     setScanId(null);
-    setSelectedFile(null);
+    setUploadedFiles([]);
     setFileFormat(null);
     setError(null);
+    setUploadError(null);
   };
 
   // Handler: retry the current scan
   const handleRetry = async () => {
     setScanId(null);
     setError(null);
-    // Brief delay to allow state cleanup before re-submitting
     await handleSubmit();
+  };
+
+  // Handler: navigate to audit/mapping view with scan results
+  const handleViewResults = () => {
+    if (scanId && uploadedFiles.length > 0 && onViewResults) {
+      onViewResults(uploadedFiles[0].path, scanId);
+    }
   };
 
   return (
@@ -123,25 +152,25 @@ export function IngestPage() {
           <UploadIcon className="h-8 w-8 text-accent" />
           <h1 className="text-3xl font-extrabold text-primary">File Ingestion</h1>
         </div>
-        <p className="text-slate-600 leading-relaxed mb-8">
-          Select a local data file to sanitize. Supported formats: JSONL, CSV, and Parquet.
+        <p className="text-muted leading-relaxed mb-8">
+          Upload data files to sanitize. Supported formats: JSONL, CSV, and Parquet.
         </p>
 
         {/* Inline Helper Banner */}
         {showHelper && pageState === 'idle' && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-8 flex items-start gap-3">
-            <InfoIcon className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+          <div className="bg-accent-light border border-[var(--border-accent)] rounded-lg p-4 mb-8 flex items-start gap-3">
+            <InfoIcon className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-primary">New to Cecil?</p>
-              <p className="text-sm text-slate-600 mt-0.5">
-                Select a data file using the file browser below to begin sanitizing your data.
-                Cecil processes everything locally on your machine.
+              <p className="text-sm text-muted mt-0.5">
+                Click "Browse Files" to select data files from your computer.
+                Cecil uploads them locally and processes everything on your machine.
               </p>
             </div>
             <button
               type="button"
               onClick={dismissHelper}
-              className="flex-shrink-0 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+              className="flex-shrink-0 p-1 text-faint hover:text-muted transition-colors"
               aria-label="Dismiss helper"
             >
               <XIcon className="h-4 w-4" />
@@ -154,8 +183,12 @@ export function IngestPage() {
           {pageState === 'idle' && (
             <>
               <FilePickerCard
-                onFileSelect={handleFileSelect}
-                selectedFile={selectedFile}
+                onFilesUploaded={setUploadedFiles}
+                uploadedFiles={uploadedFiles}
+                isUploading={isUploading}
+                uploadError={uploadError}
+                onBrowseClick={handleBrowseClick}
+                onRemoveFile={handleRemoveFile}
                 disabled={isSubmitting || isScanning}
               />
               <FormatSelector
@@ -166,7 +199,7 @@ export function IngestPage() {
 
               {/* Error display (API submission errors only) */}
               {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-danger text-sm">
+                <div className="p-4 bg-danger-bg border border-[var(--danger-border)] rounded-lg text-danger text-sm">
                   {error}
                 </div>
               )}
@@ -175,15 +208,15 @@ export function IngestPage() {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isSubmitting || isScanning || !selectedFile}
+                disabled={isSubmitting || isScanning || uploadedFiles.length === 0 || !fileFormat}
                 className={`
                   px-6 py-3 rounded-lg font-medium
                   transition-all duration-150 ease-out
-                  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600
+                  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent
                   active:scale-[0.98]
-                  ${isSubmitting || isScanning || !selectedFile
-                    ? 'bg-slate-200 text-slate-600 cursor-not-allowed'
-                    : 'bg-accent hover:bg-indigo-700 text-white'
+                  ${isSubmitting || isScanning || uploadedFiles.length === 0 || !fileFormat
+                    ? 'bg-skeleton text-muted cursor-not-allowed'
+                    : 'bg-accent hover:bg-accent-hover text-white'
                   }
                 `}
               >
@@ -197,7 +230,7 @@ export function IngestPage() {
           )}
 
           {pageState === 'completed' && progress && (
-            <div className="bg-white border border-emerald-200 rounded-lg p-8 text-center">
+            <div className="bg-card border border-[var(--success-border)] rounded-lg p-8 text-center">
               <CheckCircleIcon className="h-12 w-12 text-emerald-500 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-primary mb-2">Scan Complete</h2>
               <p className="text-muted mb-6">
@@ -206,8 +239,8 @@ export function IngestPage() {
               <div className="flex items-center justify-center gap-4">
                 <button
                   type="button"
-                  onClick={handleNewScan}
-                  className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors duration-150"
+                  onClick={handleViewResults}
+                  className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-lg font-medium transition-colors duration-150"
                 >
                   View Audit Results
                   <ArrowRightIcon className="h-4 w-4" />
@@ -215,7 +248,7 @@ export function IngestPage() {
                 <button
                   type="button"
                   onClick={handleNewScan}
-                  className="px-6 py-3 border border-slate-200 text-primary hover:bg-slate-50 rounded-lg font-medium transition-colors duration-150"
+                  className="px-6 py-3 border text-primary hover:bg-subtle rounded-lg font-medium transition-colors duration-150"
                 >
                   Start New Scan
                 </button>
@@ -224,7 +257,7 @@ export function IngestPage() {
           )}
 
           {pageState === 'failed' && progress && (
-            <div className="bg-white border border-red-200 rounded-lg p-8 text-center">
+            <div className="bg-card border border-[var(--danger-border)] rounded-lg p-8 text-center">
               <AlertCircleIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-primary mb-2">Scan Failed</h2>
               <p className="text-muted mb-6">{getErrorMessage(progress.error_type)}</p>
@@ -232,7 +265,7 @@ export function IngestPage() {
                 <button
                   type="button"
                   onClick={handleRetry}
-                  className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors duration-150"
+                  className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-lg font-medium transition-colors duration-150"
                 >
                   <RefreshCwIcon className="h-4 w-4" />
                   Retry
@@ -240,9 +273,9 @@ export function IngestPage() {
                 <button
                   type="button"
                   onClick={handleNewScan}
-                  className="px-6 py-3 border border-slate-200 text-primary hover:bg-slate-50 rounded-lg font-medium transition-colors duration-150"
+                  className="px-6 py-3 border text-primary hover:bg-subtle rounded-lg font-medium transition-colors duration-150"
                 >
-                  Change File
+                  Upload New Files
                 </button>
               </div>
             </div>

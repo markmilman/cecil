@@ -1,12 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueuedFiles } from './QueuedFiles';
+import { FileFormat } from '@/types';
 
-import type { QueuedFile } from './QueuedFiles';
+import type { UploadedFileInfo } from '@/types';
 
-const MOCK_FILES: QueuedFile[] = [
-  { name: 'test-file.jsonl', size: '2.4 MB' },
-  { name: 'data.csv', size: '890 KB' },
+const MOCK_FILES: UploadedFileInfo[] = [
+  { name: 'test-file.jsonl', path: '/tmp/uploads/test-file.jsonl', size: 2516582, format: FileFormat.JSONL },
+  { name: 'data.csv', path: '/tmp/uploads/data.csv', size: 911360, format: FileFormat.CSV },
 ];
 
 describe('QueuedFiles', () => {
@@ -45,9 +46,10 @@ describe('QueuedFiles', () => {
       />,
     );
     expect(screen.getByText('test-file.jsonl')).toBeInTheDocument();
-    expect(screen.getByText('2.4 MB')).toBeInTheDocument();
     expect(screen.getByText('data.csv')).toBeInTheDocument();
-    expect(screen.getByText('890 KB')).toBeInTheDocument();
+    // Sizes are formatted from bytes
+    expect(screen.getByText('2.4 MB')).toBeInTheDocument();
+    expect(screen.getByText('890.0 KB')).toBeInTheDocument();
   });
 
   it('calls onRemoveFile with correct index when remove button is clicked', () => {
@@ -102,7 +104,7 @@ describe('QueuedFiles', () => {
         onSanitize={onSanitize}
       />,
     );
-    fireEvent.click(screen.getByText('Sanitize 2 Files'));
+    fireEvent.click(screen.getByText('Next: Configure Mapping'));
     expect(onSanitize).toHaveBeenCalledOnce();
   });
 
@@ -115,7 +117,7 @@ describe('QueuedFiles', () => {
         onSanitize={vi.fn()}
       />,
     );
-    expect(screen.getByText('Sanitize 0 Files')).toBeDisabled();
+    expect(screen.getByText('Next: Configure Mapping')).toBeDisabled();
   });
 
   it('renders trust badge', () => {

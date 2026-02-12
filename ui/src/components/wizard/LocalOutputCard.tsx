@@ -1,16 +1,19 @@
+import { EyeIcon } from 'lucide-react';
+
 interface LocalOutputCardProps {
   outputPath: string;
   onOpenFolder?: () => void;
+  onViewResults?: () => void;
 }
 
 /**
  * Local Output card for the wizard completion view.
  *
- * Shows the output directory path in a code block and a full-width
- * "Open Folder" button. Used in Step 4 to let users access their
- * sanitized files.
+ * Shows the output directory path in a code block and action buttons
+ * for opening the folder and viewing sanitized results. Used in Step 5
+ * to let users access and review their sanitized files.
  */
-export function LocalOutputCard({ outputPath, onOpenFolder }: LocalOutputCardProps) {
+export function LocalOutputCard({ outputPath, onOpenFolder, onViewResults }: LocalOutputCardProps) {
   return (
     <div
       style={{
@@ -52,14 +55,25 @@ export function LocalOutputCard({ outputPath, onOpenFolder }: LocalOutputCardPro
       >
         {outputPath}
       </div>
-      <button
-        type="button"
-        className="btn btn-secondary"
-        style={{ width: '100%', justifyContent: 'center' }}
-        onClick={onOpenFolder}
-      >
-        Open Folder
-      </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ width: '100%', justifyContent: 'center', gap: '8px' }}
+          onClick={onViewResults}
+        >
+          <EyeIcon className="h-4 w-4" />
+          View Results
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          style={{ width: '100%', justifyContent: 'center' }}
+          onClick={onOpenFolder}
+        >
+          Open Folder
+        </button>
+      </div>
     </div>
   );
 }

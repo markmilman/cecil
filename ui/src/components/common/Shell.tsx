@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
-import { MoonIcon, SunIcon } from 'lucide-react';
-import { useThemeContext } from '@/hooks/useTheme';
+import { NavLink } from '@/components/common/NavLink';
+import { ThemeToggle } from '@/components/common/ThemeToggle';
 
 /**
  * Props for the Shell component
@@ -17,24 +17,23 @@ interface ShellProps {
 interface NavLinkItem {
   view: string;
   label: string;
+  enabled: boolean;
 }
 
 const NAV_LINKS: NavLinkItem[] = [
-  { view: 'dashboard', label: 'Dashboard' },
-  { view: 'mapping', label: 'Mapping Rules' },
-  { view: 'settings', label: 'Settings' },
+  { view: 'dashboard', label: 'Dashboard', enabled: true },
+  { view: 'mapping', label: 'Mapping Rules', enabled: true },
+  { view: 'settings', label: 'Settings', enabled: false },
 ];
 
 /**
  * Shell layout component with top navigation bar
  *
  * Provides the main layout structure with a fixed 64px top nav bar
- * containing logo, navigation links, theme toggle, and user avatar.
+ * containing logo, navigation links, and theme toggle.
  * Navigation is state-driven via props rather than React Router.
  */
 export function Shell({ children, activeView, onNavigate }: ShellProps) {
-  const { theme, toggleTheme } = useThemeContext();
-
   return (
     <div
       className="flex h-full flex-col"
@@ -81,78 +80,21 @@ export function Shell({ children, activeView, onNavigate }: ShellProps) {
 
           {/* Nav Links */}
           <div className="flex items-center gap-6" role="list">
-            {NAV_LINKS.map((link) => {
-              const isActive = activeView === link.view;
-              return (
-                <button
-                  key={link.view}
-                  type="button"
-                  role="listitem"
-                  onClick={() => onNavigate(link.view)}
-                  className="cursor-pointer border-none bg-transparent text-sm font-medium transition-colors duration-200"
-                  style={{
-                    color: isActive
-                      ? 'var(--text-primary)'
-                      : 'var(--text-secondary)',
-                    padding: 0,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.color = 'var(--primary-color)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = isActive
-                      ? 'var(--text-primary)'
-                      : 'var(--text-secondary)';
-                  }}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  {link.label}
-                </button>
-              );
-            })}
+            {NAV_LINKS.map((link) => (
+              <NavLink
+                key={link.view}
+                view={link.view}
+                label={link.label}
+                enabled={link.enabled}
+                isActive={activeView === link.view}
+                onClick={onNavigate}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Right: Theme Toggle + User Avatar */}
-        <div className="flex items-center gap-4">
-          {/* Theme Toggle */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="flex cursor-pointer items-center justify-center rounded-full border-none bg-transparent p-2 transition-colors duration-200"
-            style={{ color: 'var(--text-secondary)' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--bg-body)';
-              e.currentTarget.style.color = 'var(--text-primary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = 'var(--text-secondary)';
-            }}
-            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
-            title="Toggle Theme"
-          >
-            {theme === 'light' ? (
-              <MoonIcon className="h-5 w-5" />
-            ) : (
-              <SunIcon className="h-5 w-5" />
-            )}
-          </button>
-
-          {/* User Avatar */}
-          <div
-            className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
-            style={{
-              backgroundColor: 'var(--primary-light)',
-              color: 'var(--primary-color)',
-            }}
-            aria-label="User avatar"
-          >
-            JS
-          </div>
-        </div>
+        {/* Right: Theme Toggle */}
+        <ThemeToggle />
       </nav>
 
       {/* Main Content Area */}

@@ -1,10 +1,13 @@
 import { useState, useCallback } from 'react';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
 import { Shell } from '@/components/common/Shell';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { WizardContainer } from '@/components/wizard/WizardContainer';
+import { MappingPage } from '@/pages/MappingPage';
+import { IngestPage } from '@/pages/IngestPage';
 
-import type { ActiveView } from '@/types';
+import type { ActiveView, UploadedFileInfo, WizardStep } from '@/types';
 
 /**
  * Main App component
@@ -15,19 +18,58 @@ import type { ActiveView } from '@/types';
  */
 export function App() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+  const [mappingSource, setMappingSource] = useState<string | null>(null);
+  const [wizardMappingId, setWizardMappingId] = useState<string | null>(null);
+  const [wizardFiles, setWizardFiles] = useState<UploadedFileInfo[]>([]);
+  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
+  const [viewMappingId, setViewMappingId] = useState<string | null>(null);
 
   const handleNavigate = useCallback((view: string) => {
-    if (view === 'dashboard' || view === 'wizard') {
+    if (view === 'dashboard' || view === 'wizard' || view === 'mapping' || view === 'ingest') {
+      if (view !== 'mapping') {
+        setViewMappingId(null);
+      }
       setActiveView(view);
     }
   }, []);
 
+  const handleViewMapping = useCallback((mappingId: string) => {
+    setViewMappingId(mappingId);
+    setMappingSource(null);
+    setActiveView('mapping');
+  }, []);
+
   const handleStartWizard = useCallback(() => {
+    setWizardFiles([]);
+    setWizardStep(1);
+    setWizardMappingId(null);
     setActiveView('wizard');
   }, []);
 
   const handleBackToDashboard = useCallback(() => {
+    setWizardFiles([]);
+    setWizardStep(1);
+    setWizardMappingId(null);
     setActiveView('dashboard');
+  }, []);
+
+  const handleConfigureMapping = useCallback((source: string) => {
+    setMappingSource(source);
+    setActiveView('mapping');
+  }, []);
+
+  const handleMappingComplete = useCallback((mappingId: string) => {
+    setWizardMappingId(mappingId);
+    setActiveView('wizard');
+  }, []);
+
+  const handleClearWizardMappingId = useCallback(() => {
+    setWizardMappingId(null);
+  }, []);
+
+  const handleViewResults = useCallback((source: string, _scanId: string) => {
+    setMappingSource(source);
+    setActiveView('mapping');
   }, []);
 
   return (
@@ -43,12 +85,35 @@ export function App() {
             boxSizing: 'border-box',
           }}
         >
-          {activeView === 'dashboard' && (
-            <DashboardPage onStartWizard={handleStartWizard} />
-          )}
-          {activeView === 'wizard' && (
-            <WizardContainer onBackToDashboard={handleBackToDashboard} />
-          )}
+          <ErrorBoundary key={activeView}>
+            {activeView === 'dashboard' && (
+              <DashboardPage onStartWizard={handleStartWizard} onViewMapping={handleViewMapping} />
+            )}
+            {activeView === 'wizard' && (
+              <WizardContainer
+                onBackToDashboard={handleBackToDashboard}
+                onConfigureMapping={handleConfigureMapping}
+                initialMappingId={wizardMappingId}
+                onClearInitialMappingId={handleClearWizardMappingId}
+                files={wizardFiles}
+                onFilesChange={setWizardFiles}
+                step={wizardStep}
+                onStepChange={setWizardStep}
+              />
+            )}
+            {activeView === 'mapping' && (
+              <MappingPage
+                source={mappingSource}
+                onStartWizard={handleStartWizard}
+                onBackToDashboard={handleBackToDashboard}
+                onMappingComplete={handleMappingComplete}
+                initialMappingId={viewMappingId}
+              />
+            )}
+            {activeView === 'ingest' && (
+              <IngestPage onViewResults={handleViewResults} />
+            )}
+          </ErrorBoundary>
         </div>
       </Shell>
     </ThemeProvider>

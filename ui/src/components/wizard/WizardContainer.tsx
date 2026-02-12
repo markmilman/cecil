@@ -1,73 +1,162 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { UploadZone } from './UploadZone';
 import { QueuedFiles } from './QueuedFiles';
+import { MappingConfigStep } from './MappingConfigStep';
 import { ProcessingView } from './ProcessingView';
 import { CompletionView } from './CompletionView';
+import { ResultsViewer } from './ResultsViewer';
+import { apiClient } from '@/lib/apiClient';
 
-import type { QueuedFile } from './QueuedFiles';
+import type { UploadedFileInfo } from '@/types';
 import type { WizardStep } from '@/types';
-
-/**
- * Mock files added when the user "browses" in Step 1.
- * These flow through the wizard to demonstrate the full pipeline.
- */
-const MOCK_FILES: QueuedFile[] = [
-  { name: 'app-logs-prod.jsonl', size: '2.4 MB' },
-  { name: 'api-requests-2024.csv', size: '890 KB' },
-  { name: 'user-sessions.parquet', size: '1.1 MB' },
-];
 
 interface WizardContainerProps {
   onBackToDashboard: () => void;
+  onConfigureMapping?: (source: string) => void;
+  initialMappingId?: string | null;
+  onClearInitialMappingId?: () => void;
+  files: UploadedFileInfo[];
+  onFilesChange: (files: UploadedFileInfo[]) => void;
+  step: WizardStep;
+  onStepChange: (step: WizardStep) => void;
 }
 
 /**
  * WizardContainer component
  *
- * Manages the 4-step ingestion wizard flow:
- *   Step 1: UploadZone — file selection
- *   Step 2: QueuedFiles — review queued files
- *   Step 3: ProcessingView — sanitization progress
- *   Step 4: CompletionView — results and CTA
+ * Manages the 5-step ingestion wizard flow:
+ *   Step 1: UploadZone — file selection via native file picker
+ *   Step 2: QueuedFiles — review uploaded files
+ *   Step 3: MappingConfigStep — load or create mapping rules
+ *   Step 4: ProcessingView — sanitization progress
+ *   Step 5: CompletionView — results and CTA
  *
- * Owns the step state machine and the mock file list that
+ * Owns the step state machine and the uploaded file list that
  * persists across steps. Each step transition applies a fadeIn
  * animation via the animate-fade-in CSS class.
  */
-export function WizardContainer({ onBackToDashboard }: WizardContainerProps) {
-  const [step, setStep] = useState<WizardStep>(1);
-  const [files, setFiles] = useState<QueuedFile[]>([]);
+export function WizardContainer({
+  onBackToDashboard,
+  onConfigureMapping,
+  initialMappingId,
+  onClearInitialMappingId,
+  files,
+  onFilesChange,
+  step,
+  onStepChange,
+}: WizardContainerProps) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [mappingId, setMappingId] = useState<string | null>(initialMappingId ?? null);
+  const [outputDir, setOutputDir] = useState<string>('~/.cecil/output/');
+  const [sanitizeResult, setSanitizeResult] = useState<{
+    outputPath: string;
+    recordsProcessed: number;
+    recordsSanitized: number;
+  } | null>(null);
+  const [showResultsViewer, setShowResultsViewer] = useState(false);
 
-  const handleBrowseFiles = useCallback(() => {
-    setFiles(MOCK_FILES);
-    setStep(2);
-  }, []);
+  // When returning from the mapping editor with a mapping ID,
+  // resume at step 3 with the mapping pre-loaded
+  useEffect(() => {
+    if (initialMappingId) {
+      setMappingId(initialMappingId);
+      if (files.length > 0) {
+        onStepChange(3);
+      }
+      onClearInitialMappingId?.();
+    }
+  }, [initialMappingId, files.length, onStepChange, onClearInitialMappingId]);
+
+  const handleBrowseFiles = useCallback(async (fileList: FileList) => {
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const selected = Array.from(fileList);
+      const response = await apiClient.uploadFiles(selected);
+      if (response.files.length > 0) {
+        onFilesChange(response.files);
+        onStepChange(2);
+      }
+      if (response.errors.length > 0) {
+        setUploadError(response.errors.join('; '));
+      }
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Failed to upload files');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [onFilesChange, onStepChange]);
 
   const handleRemoveFile = useCallback((index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+    onFilesChange(files.filter((_, i) => i !== index));
+  }, [files, onFilesChange]);
 
   const handleCancel = useCallback(() => {
-    setFiles([]);
-    setStep(1);
-  }, []);
+    onFilesChange([]);
+    onStepChange(1);
+  }, [onFilesChange, onStepChange]);
 
   const handleSanitize = useCallback(() => {
-    setStep(3);
-  }, []);
+    onStepChange(3);
+  }, [onStepChange]);
 
-  const handleProcessingComplete = useCallback(() => {
-    setStep(4);
-  }, []);
+  const handleMappingReady = useCallback((id: string, dir: string) => {
+    setMappingId(id);
+    setOutputDir(dir);
+    onStepChange(4);
+  }, [onStepChange]);
+
+  const handleProcessingComplete = useCallback((result: {
+    outputPath: string;
+    recordsProcessed: number;
+    recordsSanitized: number;
+  }) => {
+    setSanitizeResult(result);
+    onStepChange(5);
+  }, [onStepChange]);
 
   const handleStopProcess = useCallback(() => {
-    setStep(2);
+    onStepChange(3);
+  }, [onStepChange]);
+
+  const handleOpenFolder = useCallback(async () => {
+    try {
+      const filePath = sanitizeResult?.outputPath ?? outputDir;
+      // Extract parent directory — openDirectory expects a directory, not a file
+      const dirPath = filePath.includes('/')
+        ? filePath.substring(0, filePath.lastIndexOf('/'))
+        : filePath;
+      await apiClient.openDirectory(dirPath);
+    } catch (err) {
+      // Silently fail - opening folder is a convenience feature
+      console.error('Failed to open folder:', err);
+    }
+  }, [sanitizeResult, outputDir]);
+
+  const handleGetReport = useCallback(() => {
+    // TODO: Implement SaaS lead capture flow (US.10)
+    // For now, show a placeholder message
+    alert('Cost analysis reports coming soon! This feature will allow you to receive detailed cost insights and optimization recommendations.');
+  }, []);
+
+  const handleViewResults = useCallback(() => {
+    setShowResultsViewer(true);
+  }, []);
+
+  const handleCloseResultsViewer = useCallback(() => {
+    setShowResultsViewer(false);
   }, []);
 
   return (
-    <div key={step} className="animate-fade-in">
+    <>
+      <div key={step} className="animate-fade-in">
       {step === 1 && (
-        <UploadZone onBrowseFiles={handleBrowseFiles} />
+        <UploadZone
+          onBrowseFiles={handleBrowseFiles}
+          isUploading={isUploading}
+          uploadError={uploadError}
+        />
       )}
       {step === 2 && (
         <QueuedFiles
@@ -75,21 +164,48 @@ export function WizardContainer({ onBackToDashboard }: WizardContainerProps) {
           onRemoveFile={handleRemoveFile}
           onCancel={handleCancel}
           onSanitize={handleSanitize}
+          onBack={() => onStepChange(1)}
         />
       )}
       {step === 3 && (
+        <MappingConfigStep
+          files={files}
+          onReady={handleMappingReady}
+          onBack={() => onStepChange(2)}
+          onCreateMapping={(source) => onConfigureMapping?.(source)}
+          initialMappingId={mappingId}
+        />
+      )}
+      {step === 4 && (
         <ProcessingView
+          source={files[0].path}
+          mappingId={mappingId!}
+          outputDir={outputDir}
           onComplete={handleProcessingComplete}
           onStop={handleStopProcess}
         />
       )}
-      {step === 4 && (
+      {step === 5 && (
         <CompletionView
           fileCount={files.length}
-          outputPath="~/.cecil/output/"
+          outputPath={sanitizeResult?.outputPath ?? outputDir}
+          recordsProcessed={sanitizeResult?.recordsProcessed}
+          recordsSanitized={sanitizeResult?.recordsSanitized}
           onBackToDashboard={onBackToDashboard}
+          onOpenFolder={handleOpenFolder}
+          onViewResults={handleViewResults}
+          onGetReport={handleGetReport}
+          onBack={() => onStepChange(3)}
         />
       )}
-    </div>
+      </div>
+
+      {showResultsViewer && sanitizeResult?.outputPath && (
+        <ResultsViewer
+          outputPath={sanitizeResult.outputPath}
+          onClose={handleCloseResultsViewer}
+        />
+      )}
+    </>
   );
 }

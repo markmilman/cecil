@@ -1,33 +1,76 @@
-import { MapIcon } from 'lucide-react';
-import { EmptyState } from '@/components/common/EmptyState';
-
 /**
- * Mapping page component
+ * MappingPage component
  *
- * Displays the schema mapping interface. Currently shows an empty state
- * guiding users to run a scan first.
+ * Displays the schema mapping interface. When a source is provided,
+ * renders the MappingEditor. Otherwise shows the MappingEmptyState
+ * guiding users to upload data first, along with a list of saved mappings.
  */
-export function MappingPage() {
-  return (
-    <div className="p-10">
-      <div className="max-w-6xl mx-auto">
-        {/* Page Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <MapIcon className="h-8 w-8 text-accent" />
-            <h1 className="text-3xl font-extrabold text-primary">Schema Mapping</h1>
-          </div>
-          <p className="text-slate-600 leading-relaxed">
-            Configure sanitization rules for your data sources
-          </p>
-        </div>
 
-        {/* Empty State */}
-        <EmptyState
-          icon={<MapIcon />}
-          title="No Active Scan"
-          description="Run a scan on the Ingest page first, then return here to configure sanitization mappings for your data fields."
-        />
+import { useState, useCallback, useEffect } from 'react';
+import { MappingEditor } from '@/components/mapping/MappingEditor';
+import { MappingEmptyState } from '@/components/mapping/MappingEmptyState';
+import { SavedMappingsList } from '@/components/mapping/SavedMappingsList';
+import { MappingViewer } from '@/components/mapping/MappingViewer';
+import { apiClient } from '@/lib/apiClient';
+
+import type { MappingConfigResponse } from '@/types';
+
+interface MappingPageProps {
+  source?: string | null;
+  onStartWizard?: () => void;
+  onBackToDashboard?: () => void;
+  onMappingComplete?: (mappingId: string) => void;
+  initialMappingId?: string | null;
+}
+
+export function MappingPage({
+  source,
+  onStartWizard,
+  onBackToDashboard,
+  onMappingComplete,
+  initialMappingId,
+}: MappingPageProps) {
+  const [viewingMapping, setViewingMapping] = useState<MappingConfigResponse | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (initialMappingId) {
+      apiClient.getMapping(initialMappingId).then(setViewingMapping).catch(() => {
+        // Mapping may have been deleted; ignore
+      });
+    }
+  }, [initialMappingId]);
+
+  const handleMappingSaved = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  if (source) {
+    return (
+      <MappingEditor
+        source={source}
+        onBackToDashboard={onBackToDashboard || (() => {})}
+        onMappingComplete={onMappingComplete}
+      />
+    );
+  }
+
+  if (viewingMapping) {
+    return (
+      <MappingViewer
+        mapping={viewingMapping}
+        onBack={() => setViewingMapping(null)}
+        onSaved={handleMappingSaved}
+      />
+    );
+  }
+
+  return (
+    <div>
+      <MappingEmptyState onStartWizard={onStartWizard || (() => {})} />
+
+      <div style={{ marginTop: '32px' }}>
+        <SavedMappingsList key={refreshKey} onViewMapping={setViewingMapping} />
       </div>
     </div>
   );

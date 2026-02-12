@@ -21,7 +21,7 @@ const FORMAT_OPTIONS: Array<{ value: FileFormat | null; label: string; descripti
  */
 export function FormatSelector({ value, onChange, disabled = false }: FormatSelectorProps) {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
+    <div className="bg-card border rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
       <fieldset disabled={disabled}>
         <legend className="text-sm font-semibold text-primary mb-4">File Format</legend>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -35,10 +35,10 @@ export function FormatSelector({ value, onChange, disabled = false }: FormatSele
                 className={`
                   flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer
                   transition-all duration-200
-                  focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-indigo-600
+                  focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent
                   ${isSelected
-                    ? 'border-accent bg-indigo-50 text-accent scale-105 shadow-md'
-                    : 'border-slate-200 hover:border-indigo-200 hover:shadow-sm text-primary'
+                    ? 'border-accent bg-accent-light text-accent scale-105 shadow-md'
+                    : 'border hover:border-[var(--border-accent)] hover:shadow-sm text-primary'
                   }
                   ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
@@ -54,7 +54,7 @@ export function FormatSelector({ value, onChange, disabled = false }: FormatSele
                   className="sr-only"
                 />
                 <span className="font-semibold text-sm">{option.label}</span>
-                <span className="text-xs text-slate-600 mt-1 text-center">{option.description}</span>
+                <span className="text-xs text-muted mt-1 text-center">{option.description}</span>
               </label>
             );
           })}
