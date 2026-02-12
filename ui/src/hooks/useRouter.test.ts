@@ -106,6 +106,20 @@ describe('useRouter', () => {
     expect(result.current.params).toEqual({ mappingId: 'my-mapping' });
   });
 
+  it('parses /job/:id as dashboard view with jobId param', () => {
+    window.history.replaceState({}, '', '/job/abc-123');
+    const { result } = renderHook(() => useRouter());
+    expect(result.current.view).toBe('dashboard');
+    expect(result.current.params).toEqual({ jobId: 'abc-123' });
+  });
+
+  it('parses /job without id as dashboard with no jobId', () => {
+    window.history.replaceState({}, '', '/job');
+    const { result } = renderHook(() => useRouter());
+    expect(result.current.view).toBe('dashboard');
+    expect(result.current.params).toEqual({});
+  });
+
   it('handles trailing slashes', () => {
     window.history.replaceState({}, '', '/wizard/');
     const { result } = renderHook(() => useRouter());

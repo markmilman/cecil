@@ -72,6 +72,14 @@ export function App() {
     router.navigate('/mapping');
   }, [router]);
 
+  const handleJobSelect = useCallback((jobId: string | null) => {
+    if (jobId) {
+      router.replace(`/job/${jobId}`);
+    } else {
+      router.replace('/');
+    }
+  }, [router]);
+
   return (
     <ThemeProvider>
       <Shell activeView={activeView} onNavigate={handleNavigate}>
@@ -87,7 +95,12 @@ export function App() {
         >
           <ErrorBoundary key={activeView}>
             {activeView === 'dashboard' && (
-              <DashboardPage onStartWizard={handleStartWizard} onViewMapping={handleViewMapping} />
+              <DashboardPage
+                onStartWizard={handleStartWizard}
+                onViewMapping={handleViewMapping}
+                onJobSelect={handleJobSelect}
+                initialJobId={router.params.jobId}
+              />
             )}
             {activeView === 'wizard' && (
               <WizardContainer

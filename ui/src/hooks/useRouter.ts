@@ -5,11 +5,14 @@ import type { ActiveView } from '@/types';
 /**
  * Parsed route state derived from the current URL pathname.
  */
+export interface RouteParams {
+  mappingId?: string;
+  jobId?: string;
+}
+
 export interface RouterState {
   view: ActiveView;
-  params: {
-    mappingId?: string;
-  };
+  params: RouteParams;
 }
 
 /**
@@ -17,7 +20,7 @@ export interface RouterState {
  */
 export interface UseRouterReturn {
   view: ActiveView;
-  params: { mappingId?: string };
+  params: RouteParams;
   navigate: (path: string) => void;
   replace: (path: string) => void;
 }
@@ -25,6 +28,7 @@ export interface UseRouterReturn {
 /**
  * URL-to-view mapping scheme:
  *   /            → dashboard
+ *   /job/:id     → dashboard (with jobId param, opens detail drawer)
  *   /wizard      → wizard
  *   /mapping     → mapping
  *   /mapping/:id → mapping (with mappingId param)
@@ -40,6 +44,14 @@ function parsePath(pathname: string): RouterState {
   }
 
   const first = segments[0];
+
+  if (first === 'job') {
+    const jobId = segments[1];
+    return {
+      view: 'dashboard',
+      params: jobId ? { jobId } : {},
+    };
+  }
 
   if (first === 'wizard') {
     return { view: 'wizard', params: {} };
