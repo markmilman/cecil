@@ -120,8 +120,12 @@ export function WizardContainer({
 
   const handleOpenFolder = useCallback(async () => {
     try {
-      const path = sanitizeResult?.outputPath ?? outputDir;
-      await apiClient.openDirectory(path);
+      const filePath = sanitizeResult?.outputPath ?? outputDir;
+      // Extract parent directory — openDirectory expects a directory, not a file
+      const dirPath = filePath.includes('/')
+        ? filePath.substring(0, filePath.lastIndexOf('/'))
+        : filePath;
+      await apiClient.openDirectory(dirPath);
     } catch (err) {
       // Silently fail - opening folder is a convenience feature
       console.error('Failed to open folder:', err);
