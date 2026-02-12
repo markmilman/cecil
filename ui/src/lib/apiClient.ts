@@ -395,7 +395,7 @@ export class ApiClient {
       records: Record<string, unknown>[];
       total_count: number;
       path: string;
-    }>('/api/v1/scans/preview-output', { path, offset, limit });
+    }>('/api/v1/filesystem/read-jsonl', { path, offset, limit });
     return response.data;
   }
 
