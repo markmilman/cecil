@@ -6,6 +6,7 @@
  * and optional validation/preview panels.
  */
 
+import { useState, useCallback } from 'react';
 import { ArrowLeftIcon, AlertCircleIcon, Loader2Icon, ArrowRightIcon } from 'lucide-react';
 import { useMapping } from '@/hooks/useMapping';
 import { MappingToolbar } from './MappingToolbar';
@@ -38,6 +39,14 @@ export function MappingEditor({ source, onBackToDashboard, onMappingComplete }: 
     dismissValidation,
     dismissPreview,
   } = useMapping(source);
+
+  // Default name based on source filename
+  const defaultName = source.split('/').pop()?.replace(/\.(jsonl|csv|parquet)$/i, '') || 'mapping';
+  const [mappingName, setMappingName] = useState<string>(defaultName);
+
+  const handleSave = useCallback(() => {
+    save(mappingName.trim() || undefined);
+  }, [save, mappingName]);
 
   if (isLoading) {
     return (
@@ -145,6 +154,49 @@ export function MappingEditor({ source, onBackToDashboard, onMappingComplete }: 
         </div>
       )}
 
+      {/* Name Input */}
+      <div style={{ marginBottom: '16px' }}>
+        <label
+          htmlFor="mapping-name"
+          style={{
+            display: 'block',
+            fontSize: '14px',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            marginBottom: '6px',
+          }}
+        >
+          Mapping Name
+        </label>
+        <input
+          id="mapping-name"
+          type="text"
+          value={mappingName}
+          onChange={(e) => setMappingName(e.target.value)}
+          placeholder="Enter a name for this mapping"
+          style={{
+            width: '100%',
+            maxWidth: '400px',
+            padding: '8px 12px',
+            border: '1px solid var(--border-color)',
+            borderRadius: '6px',
+            fontSize: '14px',
+            color: 'var(--text-primary)',
+            backgroundColor: 'var(--bg-card, white)',
+            boxSizing: 'border-box',
+          }}
+        />
+        <p
+          style={{
+            margin: '4px 0 0',
+            fontSize: '12px',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          Give this mapping a descriptive name to identify it later
+        </p>
+      </div>
+
       {/* Toolbar */}
       <MappingToolbar
         source={source}
@@ -153,7 +205,7 @@ export function MappingEditor({ source, onBackToDashboard, onMappingComplete }: 
         onDefaultActionChange={setDefaultAction}
         onValidate={validate}
         onPreview={preview}
-        onSave={save}
+        onSave={handleSave}
         isSaving={isSaving}
         isValid={validationResult?.is_valid}
       />

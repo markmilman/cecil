@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { FileTextIcon, PlusCircleIcon, FolderIcon, AlertCircleIcon, CheckCircleIcon } from 'lucide-react';
+import { useState, useCallback, useRef } from 'react';
+import { FileTextIcon, PlusCircleIcon, FolderIcon, AlertCircleIcon, CheckCircleIcon, UploadIcon } from 'lucide-react';
 import { WizardHeader } from './WizardHeader';
 import { apiClient } from '@/lib/apiClient';
 import { useMappingList } from '@/hooks/useMappingList';
@@ -38,11 +38,12 @@ export function MappingConfigStep({
   );
 
   const { mappings, isLoading: isLoadingMappings, error: mappingsError } = useMappingList();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUseSavedMapping = useCallback((mapping: MappingConfigResponse) => {
     setMappingId(mapping.mapping_id);
     setError(null);
-    setSuccessMessage(`Mapping loaded: ${mapping.mapping_id} (${mapping.field_count} fields)`);
+    setSuccessMessage(`Mapping loaded: ${mapping.name} (${mapping.field_count} fields)`);
   }, []);
 
   const handleLoadYaml = useCallback(async () => {
@@ -53,13 +54,35 @@ export function MappingConfigStep({
     try {
       const response: MappingConfigResponse = await apiClient.loadMappingYaml(yamlPath.trim());
       setMappingId(response.mapping_id);
-      setSuccessMessage(`Mapping loaded: ${response.mapping_id}`);
+      setSuccessMessage(`Mapping loaded: ${response.name}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load mapping YAML');
     } finally {
       setIsLoading(false);
     }
   }, [yamlPath]);
+
+  const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const content = await file.text();
+      const name = file.name.replace(/\.(yaml|yml)$/i, '');
+      const response = await apiClient.loadMappingYamlContent(content, name);
+      setMappingId(response.mapping_id);
+      setSuccessMessage(`Mapping loaded: ${response.name}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load mapping file');
+    } finally {
+      setIsLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, []);
 
   const validateOutputDir = useCallback((path: string): string | null => {
     const trimmed = path.trim();
@@ -217,9 +240,9 @@ export function MappingConfigStep({
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                           }}
-                          title={mapping.mapping_id}
+                          title={mapping.name}
                         >
-                          {mapping.mapping_id}
+                          {mapping.name}
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                           {mapping.field_count} fields • {mapping.default_action}
@@ -239,7 +262,7 @@ export function MappingConfigStep({
               </div>
             )}
 
-            {/* Manual YAML Path Input */}
+            {/* File Picker */}
             <div>
               <p
                 style={{
@@ -250,6 +273,45 @@ export function MappingConfigStep({
                 }}
               >
                 {mappings.length > 0 ? 'Or load from file:' : 'Load from file:'}
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".yaml,.yml"
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                }}
+              >
+                <UploadIcon className="h-4 w-4" />
+                {isLoading ? 'Loading...' : 'Browse for YAML File'}
+              </button>
+            </div>
+
+            {/* Manual YAML Path Input (Advanced Option) */}
+            <div style={{ marginTop: '12px' }}>
+              <p
+                style={{
+                  margin: '0 0 8px',
+                  fontSize: '13px',
+                  color: 'var(--text-secondary)',
+                  fontWeight: 500,
+                }}
+              >
+                Or enter path manually:
               </p>
               <div className="flex" style={{ gap: '8px' }}>
                 <input

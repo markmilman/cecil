@@ -31,7 +31,7 @@ export function MappingViewer({ mapping, onBack }: MappingViewerProps) {
               fontWeight: 700,
             }}
           >
-            Mapping Configuration
+            {mapping.name}
           </h2>
           <p
             style={{
@@ -80,7 +80,7 @@ export function MappingViewer({ mapping, onBack }: MappingViewerProps) {
               color: 'var(--text-primary)',
             }}
           >
-            {mapping.mapping_id}
+            Mapping Details
           </h3>
         </div>
 
@@ -92,6 +92,20 @@ export function MappingViewer({ mapping, onBack }: MappingViewerProps) {
             fontSize: '14px',
           }}
         >
+          <div>
+            <span style={{ color: 'var(--text-secondary)' }}>Mapping ID:</span>{' '}
+            <span
+              style={{
+                fontWeight: 500,
+                color: 'var(--text-primary)',
+                fontFamily: 'monospace',
+                fontSize: '12px',
+              }}
+              title={mapping.mapping_id}
+            >
+              {mapping.mapping_id}
+            </span>
+          </div>
           <div>
             <span style={{ color: 'var(--text-secondary)' }}>Default Action:</span>{' '}
             <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
