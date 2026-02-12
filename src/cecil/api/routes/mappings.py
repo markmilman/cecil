@@ -70,18 +70,27 @@ class MappingState:
     created_at: datetime
     yaml_path: str | None = None
     name: str | None = None
+    source_format: str | None = None
+    source_path: str | None = None
 
 
 # In-memory mapping store keyed by mapping_id.
 _mapping_store: dict[str, MappingState] = {}
 
 
-def _mapping_config_to_dict(config: MappingConfig, name: str | None = None) -> dict[str, Any]:
+def _mapping_config_to_dict(
+    config: MappingConfig,
+    name: str | None = None,
+    source_format: str | None = None,
+    source_path: str | None = None,
+) -> dict[str, Any]:
     """Serialize a MappingConfig to a YAML-safe dictionary.
 
     Args:
         config: The domain MappingConfig to serialize.
         name: Optional human-readable name for the mapping.
+        source_format: Optional file format the mapping was created from.
+        source_path: Optional path to the source file.
 
     Returns:
         A dictionary suitable for YAML serialization.
@@ -96,6 +105,10 @@ def _mapping_config_to_dict(config: MappingConfig, name: str | None = None) -> d
     }
     if name is not None:
         result["name"] = name
+    if source_format is not None:
+        result["source_format"] = source_format
+    if source_path is not None:
+        result["source_path"] = source_path
     return result
 
 
@@ -111,7 +124,11 @@ def _get_mappings_dir() -> Path:
 
 
 def _persist_mapping_to_yaml(
-    mapping_id: str, config: MappingConfig, name: str | None = None
+    mapping_id: str,
+    config: MappingConfig,
+    name: str | None = None,
+    source_format: str | None = None,
+    source_path: str | None = None,
 ) -> str:
     """Persist a mapping configuration to a YAML file on disk.
 
@@ -119,6 +136,8 @@ def _persist_mapping_to_yaml(
         mapping_id: The unique mapping identifier.
         config: The domain MappingConfig to persist.
         name: Optional human-readable name for the mapping.
+        source_format: Optional file format the mapping was created from.
+        source_path: Optional path to the source file.
 
     Returns:
         The absolute path to the saved YAML file.
@@ -129,7 +148,7 @@ def _persist_mapping_to_yaml(
     mappings_dir = _get_mappings_dir()
     yaml_path = mappings_dir / f"{mapping_id}.yaml"
 
-    mapping_dict = _mapping_config_to_dict(config, name)
+    mapping_dict = _mapping_config_to_dict(config, name, source_format, source_path)
 
     try:
         with yaml_path.open("w", encoding="utf-8") as f:
@@ -175,6 +194,8 @@ def _load_mappings_from_disk() -> None:
 
             # Extract name from YAML (generate default if not present)
             name = raw_data.get("name") if isinstance(raw_data, dict) else None
+            source_format = raw_data.get("source_format") if isinstance(raw_data, dict) else None
+            source_path = raw_data.get("source_path") if isinstance(raw_data, dict) else None
             if name is None:
                 # Use file modification time for default name
                 stat = yaml_file.stat()
@@ -195,6 +216,8 @@ def _load_mappings_from_disk() -> None:
                 created_at=created_at,
                 yaml_path=str(yaml_file),
                 name=name,
+                source_format=source_format,
+                source_path=source_path,
             )
 
             loaded_count += 1
@@ -264,6 +287,8 @@ def _config_to_response(
     created_at: datetime,
     yaml_path: str | None = None,
     name: str | None = None,
+    source_format: str | None = None,
+    source_path: str | None = None,
 ) -> MappingConfigResponse:
     """Convert a domain MappingConfig to an API response.
 
@@ -273,6 +298,8 @@ def _config_to_response(
         created_at: When the mapping was created.
         yaml_path: Optional path to the persisted YAML file.
         name: Optional human-readable name for the mapping.
+        source_format: Optional file format the mapping was created from.
+        source_path: Optional path to the source file.
 
     Returns:
         A MappingConfigResponse suitable for API serialization.
@@ -297,6 +324,8 @@ def _config_to_response(
         created_at=created_at,
         yaml_path=yaml_path,
         name=name,
+        source_format=source_format,
+        source_path=source_path,
     )
 
 
@@ -355,8 +384,10 @@ async def create_mapping(
     if name is None:
         name = f"Mapping {now.strftime('%Y-%m-%d %H:%M')}"
 
+    source_format = request.source_format
+
     # Persist to disk
-    yaml_path = _persist_mapping_to_yaml(mapping_id, config, name)
+    yaml_path = _persist_mapping_to_yaml(mapping_id, config, name, source_format)
 
     # Store in memory
     _mapping_store[mapping_id] = MappingState(
@@ -365,6 +396,7 @@ async def create_mapping(
         created_at=now,
         yaml_path=yaml_path,
         name=name,
+        source_format=source_format,
     )
 
     logger.info(
@@ -372,7 +404,7 @@ async def create_mapping(
         extra={"mapping_id": mapping_id, "field_count": len(config.fields)},
     )
 
-    return _config_to_response(mapping_id, config, now, yaml_path, name)
+    return _config_to_response(mapping_id, config, now, yaml_path, name, source_format)
 
 
 @router.get(
@@ -387,7 +419,13 @@ async def list_mappings() -> list[MappingConfigResponse]:
     """
     return [
         _config_to_response(
-            state.mapping_id, state.config, state.created_at, state.yaml_path, state.name
+            state.mapping_id,
+            state.config,
+            state.created_at,
+            state.yaml_path,
+            state.name,
+            state.source_format,
+            state.source_path,
         )
         for state in _mapping_store.values()
     ]
@@ -584,7 +622,13 @@ async def get_mapping(mapping_id: str) -> MappingConfigResponse | JSONResponse:
             ).model_dump(),
         )
     return _config_to_response(
-        state.mapping_id, state.config, state.created_at, state.yaml_path, state.name
+        state.mapping_id,
+        state.config,
+        state.created_at,
+        state.yaml_path,
+        state.name,
+        state.source_format,
+        state.source_path,
     )
 
 
@@ -645,7 +689,13 @@ async def update_mapping(
     # Update the YAML file on disk if it exists
     if state.yaml_path:
         try:
-            yaml_path = _persist_mapping_to_yaml(mapping_id, config, state.name)
+            yaml_path = _persist_mapping_to_yaml(
+                mapping_id,
+                config,
+                state.name,
+                state.source_format,
+                state.source_path,
+            )
             state.yaml_path = yaml_path
         except OSError as err:
             logger.warning(
@@ -659,7 +709,13 @@ async def update_mapping(
     )
 
     return _config_to_response(
-        state.mapping_id, state.config, state.created_at, state.yaml_path, state.name
+        state.mapping_id,
+        state.config,
+        state.created_at,
+        state.yaml_path,
+        state.name,
+        state.source_format,
+        state.source_path,
     )
 
 

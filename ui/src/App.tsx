@@ -22,14 +22,27 @@ export function App() {
   const [wizardMappingId, setWizardMappingId] = useState<string | null>(null);
   const [wizardFiles, setWizardFiles] = useState<UploadedFileInfo[]>([]);
   const [wizardStep, setWizardStep] = useState<WizardStep>(1);
+  const [viewMappingId, setViewMappingId] = useState<string | null>(null);
 
   const handleNavigate = useCallback((view: string) => {
     if (view === 'dashboard' || view === 'wizard' || view === 'mapping' || view === 'ingest') {
+      if (view !== 'mapping') {
+        setViewMappingId(null);
+      }
       setActiveView(view);
     }
   }, []);
 
+  const handleViewMapping = useCallback((mappingId: string) => {
+    setViewMappingId(mappingId);
+    setMappingSource(null);
+    setActiveView('mapping');
+  }, []);
+
   const handleStartWizard = useCallback(() => {
+    setWizardFiles([]);
+    setWizardStep(1);
+    setWizardMappingId(null);
     setActiveView('wizard');
   }, []);
 
@@ -74,7 +87,7 @@ export function App() {
         >
           <ErrorBoundary key={activeView}>
             {activeView === 'dashboard' && (
-              <DashboardPage onStartWizard={handleStartWizard} />
+              <DashboardPage onStartWizard={handleStartWizard} onViewMapping={handleViewMapping} />
             )}
             {activeView === 'wizard' && (
               <WizardContainer
@@ -94,6 +107,7 @@ export function App() {
                 onStartWizard={handleStartWizard}
                 onBackToDashboard={handleBackToDashboard}
                 onMappingComplete={handleMappingComplete}
+                initialMappingId={viewMappingId}
               />
             )}
             {activeView === 'ingest' && (

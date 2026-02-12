@@ -6,11 +6,12 @@
  * guiding users to upload data first, along with a list of saved mappings.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { MappingEditor } from '@/components/mapping/MappingEditor';
 import { MappingEmptyState } from '@/components/mapping/MappingEmptyState';
 import { SavedMappingsList } from '@/components/mapping/SavedMappingsList';
 import { MappingViewer } from '@/components/mapping/MappingViewer';
+import { apiClient } from '@/lib/apiClient';
 
 import type { MappingConfigResponse } from '@/types';
 
@@ -19,6 +20,7 @@ interface MappingPageProps {
   onStartWizard?: () => void;
   onBackToDashboard?: () => void;
   onMappingComplete?: (mappingId: string) => void;
+  initialMappingId?: string | null;
 }
 
 export function MappingPage({
@@ -26,9 +28,18 @@ export function MappingPage({
   onStartWizard,
   onBackToDashboard,
   onMappingComplete,
+  initialMappingId,
 }: MappingPageProps) {
   const [viewingMapping, setViewingMapping] = useState<MappingConfigResponse | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (initialMappingId) {
+      apiClient.getMapping(initialMappingId).then(setViewingMapping).catch(() => {
+        // Mapping may have been deleted; ignore
+      });
+    }
+  }, [initialMappingId]);
 
   const handleMappingSaved = useCallback(() => {
     setRefreshKey((prev) => prev + 1);

@@ -44,9 +44,12 @@ export function MappingEditor({ source, onBackToDashboard, onMappingComplete }: 
   const defaultName = source.split('/').pop()?.replace(/\.(jsonl|csv|parquet)$/i, '') || 'mapping';
   const [mappingName, setMappingName] = useState<string>(defaultName);
 
+  // Detect format from source file extension
+  const sourceFormat = source.match(/\.(jsonl|csv|parquet)$/i)?.[1]?.toLowerCase() || undefined;
+
   const handleSave = useCallback(() => {
-    save(mappingName.trim() || undefined);
-  }, [save, mappingName]);
+    save(mappingName.trim() || undefined, source, sourceFormat);
+  }, [save, mappingName, source, sourceFormat]);
 
   if (isLoading) {
     return (

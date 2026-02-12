@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
-import { FileTextIcon, PlusCircleIcon, FolderIcon, AlertCircleIcon, CheckCircleIcon, UploadIcon } from 'lucide-react';
+import { FileTextIcon, PlusCircleIcon, FolderIcon, AlertCircleIcon, CheckCircleIcon, UploadIcon, PencilIcon } from 'lucide-react';
 import { WizardHeader } from './WizardHeader';
+import { MappingViewer } from '@/components/mapping/MappingViewer';
 import { apiClient } from '@/lib/apiClient';
 import { useMappingList } from '@/hooks/useMappingList';
 import type { UploadedFileInfo, MappingConfigResponse } from '@/types';
@@ -36,8 +37,9 @@ export function MappingConfigStep({
   const [successMessage, setSuccessMessage] = useState<string | null>(
     initialMappingId ? 'Mapping loaded from editor.' : null,
   );
+  const [viewingMapping, setViewingMapping] = useState<MappingConfigResponse | null>(null);
 
-  const { mappings, isLoading: isLoadingMappings, error: mappingsError } = useMappingList();
+  const { mappings, error: mappingsError, refresh: refreshMappings } = useMappingList();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUseSavedMapping = useCallback((mapping: MappingConfigResponse) => {
@@ -45,6 +47,23 @@ export function MappingConfigStep({
     setError(null);
     setSuccessMessage(`Mapping loaded: ${mapping.name} (${mapping.field_count} fields)`);
   }, []);
+
+  const handleViewMapping = useCallback(async (mapping: MappingConfigResponse) => {
+    try {
+      const full = await apiClient.getMapping(mapping.mapping_id);
+      setViewingMapping(full);
+    } catch {
+      setViewingMapping(mapping);
+    }
+  }, []);
+
+  const handleViewerBack = useCallback(() => {
+    setViewingMapping(null);
+  }, []);
+
+  const handleViewerSaved = useCallback(() => {
+    refreshMappings();
+  }, [refreshMappings]);
 
   const handleLoadYaml = useCallback(async () => {
     if (!yamlPath.trim()) return;
@@ -107,6 +126,44 @@ export function MappingConfigStep({
       onReady(mappingId, outputDir.trim());
     }
   }, [mappingId, outputDir, outputDirError, onReady]);
+
+  if (viewingMapping) {
+    return (
+      <div>
+        <WizardHeader
+          title="View / Edit Mapping"
+          subtitle="Review and edit the mapping configuration before using it."
+        />
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <MappingViewer
+            mapping={viewingMapping}
+            onBack={handleViewerBack}
+            onSaved={handleViewerSaved}
+          />
+          <div
+            style={{
+              marginTop: '16px',
+              borderTop: '1px solid var(--border-color)',
+              paddingTop: '16px',
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                handleUseSavedMapping(viewingMapping);
+                setViewingMapping(null);
+              }}
+            >
+              Use This Mapping
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -231,11 +288,22 @@ export function MappingConfigStep({
                         fontSize: '13px',
                       }}
                     >
-                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleViewMapping(mapping)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleViewMapping(mapping); }}
+                        style={{
+                          flex: 1,
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                        }}
+                        title="Click to view / edit"
+                      >
                         <div
                           style={{
                             fontWeight: 500,
-                            color: 'var(--text-primary)',
+                            color: 'var(--primary-color, #4f46e5)',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
@@ -248,14 +316,25 @@ export function MappingConfigStep({
                           {mapping.field_count} fields • {mapping.default_action}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => handleUseSavedMapping(mapping)}
-                        style={{ padding: '4px 12px', fontSize: '12px', marginLeft: '8px' }}
-                      >
-                        Use This
-                      </button>
+                      <div style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => handleViewMapping(mapping)}
+                          style={{ padding: '4px 8px', fontSize: '12px' }}
+                          title="View / Edit"
+                        >
+                          <PencilIcon className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => handleUseSavedMapping(mapping)}
+                          style={{ padding: '4px 12px', fontSize: '12px' }}
+                        >
+                          Use This
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

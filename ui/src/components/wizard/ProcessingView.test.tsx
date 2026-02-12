@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { ProcessingView } from './ProcessingView';
@@ -116,5 +117,20 @@ describe('ProcessingView', () => {
     await waitFor(() => {
       expect(screen.getByText('> Starting sanitization...')).toBeInTheDocument();
     });
+  });
+
+  it('calls sanitize exactly once and processes the response under React StrictMode', async () => {
+    vi.useRealTimers();
+    render(
+      <StrictMode>
+        <ProcessingView {...defaultProps} />
+      </StrictMode>
+    );
+    // Wait for the async sanitize call to resolve and its response to be processed
+    await waitFor(() => {
+      expect(screen.getByText('> Scan scan-1 created.')).toBeInTheDocument();
+    });
+    // Must be exactly one API call — not two (StrictMode double-fires effects)
+    expect(apiClient.sanitize).toHaveBeenCalledTimes(1);
   });
 });

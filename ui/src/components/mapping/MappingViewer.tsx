@@ -6,13 +6,14 @@
  */
 
 import { useState } from 'react';
-import { ArrowLeftIcon, FileTextIcon, SaveIcon, CheckCircleIcon } from 'lucide-react';
+import { ArrowLeftIcon, FileTextIcon, SaveIcon, CheckCircleIcon, EyeIcon, Loader2Icon, AlertCircleIcon } from 'lucide-react';
 
 import { ActionSelector } from '@/components/mapping/ActionSelector';
+import { PreviewPanel } from '@/components/mapping/PreviewPanel';
 import { apiClient } from '@/lib/apiClient';
 import { RedactionAction } from '@/types';
 
-import type { MappingConfigResponse, FieldMappingEntry } from '@/types';
+import type { MappingConfigResponse, FieldMappingEntry, FieldPreviewEntry } from '@/types';
 
 interface MappingViewerProps {
   mapping: MappingConfigResponse;
@@ -35,6 +36,9 @@ export function MappingViewer({ mapping, onBack, onSaved }: MappingViewerProps) 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [previewEntries, setPreviewEntries] = useState<FieldPreviewEntry[]>([]);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const hasChanges =
     editedName !== mapping.name ||
@@ -81,6 +85,36 @@ export function MappingViewer({ mapping, onBack, onSaved }: MappingViewerProps) 
       setIsSaving(false);
     }
   };
+
+  const handlePreview = async () => {
+    if (!mapping.source_path) {
+      setPreviewError('Source file not available for preview');
+      return;
+    }
+
+    setIsLoadingPreview(true);
+    setPreviewError(null);
+
+    try {
+      const sampleResponse = await apiClient.getSampleRecord(mapping.source_path);
+
+      const fields: Record<string, FieldMappingEntry> = {};
+      for (const [fieldName, action] of Object.entries(editedActions)) {
+        fields[fieldName] = {
+          action,
+          options: mapping.fields[fieldName]?.options || {},
+        };
+      }
+
+      const result = await apiClient.previewMapping(fields, sampleResponse.record);
+      setPreviewEntries(result.entries);
+    } catch {
+      setPreviewError('Failed to load preview. The source file may no longer be available.');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
   return (
     <div>
       {/* Header */}
@@ -115,6 +149,29 @@ export function MappingViewer({ mapping, onBack, onSaved }: MappingViewerProps) 
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handlePreview}
+            disabled={isLoadingPreview}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            {isLoadingPreview ? (
+              <>
+                <Loader2Icon className="h-4 w-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <EyeIcon className="h-4 w-4" />
+                Preview
+              </>
+            )}
+          </button>
           <button
             type="button"
             className="btn btn-primary"
@@ -232,6 +289,12 @@ export function MappingViewer({ mapping, onBack, onSaved }: MappingViewerProps) 
               value={editedDefaultAction}
               onChange={setEditedDefaultAction}
             />
+          </div>
+          <div>
+            <span style={{ color: 'var(--text-secondary)' }}>Format:</span>{' '}
+            <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+              {mapping.source_format?.toUpperCase() || 'Any'}
+            </span>
           </div>
           <div>
             <span style={{ color: 'var(--text-secondary)' }}>Fields:</span>{' '}
@@ -392,6 +455,28 @@ export function MappingViewer({ mapping, onBack, onSaved }: MappingViewerProps) 
           </tbody>
         </table>
       </div>
+
+      {/* Preview error */}
+      {previewError && (
+        <div
+          className="flex items-center gap-2"
+          style={{
+            padding: '12px 16px',
+            backgroundColor: 'var(--danger-bg)',
+            border: '1px solid var(--danger-border)',
+            borderRadius: '8px',
+            color: 'var(--danger-color)',
+            fontSize: '14px',
+            marginTop: '16px',
+          }}
+        >
+          <AlertCircleIcon className="h-4 w-4" />
+          {previewError}
+        </div>
+      )}
+
+      {/* Preview panel */}
+      <PreviewPanel entries={previewEntries} onClose={() => setPreviewEntries([])} />
     </div>
   );
 }

@@ -46,6 +46,7 @@ export function ProcessingView({
   const completedRef = useRef(false);
   const scanIdRef = useRef<string | null>(null);
   const outputPathRef = useRef<string>('');
+  const startedRef = useRef(false);
 
   const cleanup = useCallback(() => {
     if (wsRef.current) {
@@ -73,7 +74,17 @@ export function ProcessingView({
   }, [cleanup, onStop]);
 
   useEffect(() => {
-    let cancelled = false;
+    // Guard against React StrictMode double-firing the effect,
+    // which would create two sanitization jobs on the backend.
+    // The ref persists across the StrictMode unmount/remount cycle,
+    // so the second invocation is a no-op.  We intentionally avoid
+    // a local `cancelled` flag because StrictMode's cleanup would
+    // set it to true before the async API response arrives, causing
+    // the single legitimate call's result to be discarded.
+    // Instead we rely on `completedRef` (double-completion guard)
+    // and `cleanup()` (resource teardown on real unmount).
+    if (startedRef.current) return;
+    startedRef.current = true;
 
     const startSanitization = async () => {
       try {
@@ -83,8 +94,6 @@ export function ProcessingView({
           mapping_id: mappingId,
           output_dir: outputDir,
         });
-
-        if (cancelled) return;
 
         scanIdRef.current = response.scan_id;
         outputPathRef.current = response.output_path;
@@ -105,7 +114,7 @@ export function ProcessingView({
         wsRef.current = ws;
 
         ws.onmessage = (event) => {
-          if (cancelled || completedRef.current) return;
+          if (completedRef.current) return;
 
           try {
             const progress: ScanProgress = JSON.parse(event.data);
@@ -123,13 +132,11 @@ export function ProcessingView({
               setLogLines((prev) => [...prev, '> Sanitization complete.']);
               cleanup();
               setTimeout(() => {
-                if (!cancelled) {
-                  onComplete({
-                    outputPath: outputPathRef.current,
-                    recordsProcessed: progress.records_processed,
-                    recordsSanitized: progress.records_processed,
-                  });
-                }
+                onComplete({
+                  outputPath: outputPathRef.current,
+                  recordsProcessed: progress.records_processed,
+                  recordsSanitized: progress.records_processed,
+                });
               }, 500);
             } else if (progress.status === 'failed') {
               cleanup();
@@ -145,7 +152,7 @@ export function ProcessingView({
         };
 
         ws.onerror = () => {
-          if (!cancelled && !completedRef.current) {
+          if (!completedRef.current) {
             setLogLines((prev) => [...prev, '> WebSocket connection error.']);
           }
         };
@@ -154,18 +161,15 @@ export function ProcessingView({
           // No-op — cleanup handled elsewhere
         };
       } catch (err) {
-        if (!cancelled) {
-          const message = err instanceof Error ? err.message : 'Failed to start sanitization';
-          setError(message);
-          setLogLines((prev) => [...prev, `> Error: ${message}`]);
-        }
+        const message = err instanceof Error ? err.message : 'Failed to start sanitization';
+        setError(message);
+        setLogLines((prev) => [...prev, `> Error: ${message}`]);
       }
     };
 
     startSanitization();
 
     return () => {
-      cancelled = true;
       cleanup();
     };
   }, [source, mappingId, outputDir, onComplete, cleanup]);

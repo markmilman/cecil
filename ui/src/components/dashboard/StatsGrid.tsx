@@ -1,12 +1,24 @@
 import { StatCard } from './StatCard';
 
+import type { JobRecord } from '@/types';
+
+interface StatsGridProps {
+  jobs: JobRecord[];
+}
+
 /**
  * 3-column stats grid for the dashboard.
  *
- * Displays static mock data: Records Processed, PII Redacted (with
- * trend pill), and Est. Cost Savings (highlighted with primary colors).
+ * Derives real stats from job data: Records Processed, PII Sanitized
+ * (with trend showing sanitized-to-processed ratio), and Total Jobs.
  */
-export function StatsGrid() {
+export function StatsGrid({ jobs }: StatsGridProps) {
+  const totalProcessed = jobs.reduce((sum, j) => sum + j.records_processed, 0);
+  const totalSanitized = jobs.reduce((sum, j) => sum + j.records_sanitized, 0);
+  const sanitizedPct = totalProcessed > 0
+    ? ((totalSanitized / totalProcessed) * 100).toFixed(1)
+    : '0.0';
+
   return (
     <div
       style={{
@@ -18,20 +30,16 @@ export function StatsGrid() {
     >
       <StatCard
         label="Records Processed"
-        value="14,205"
+        value={totalProcessed.toLocaleString()}
       />
       <StatCard
-        label="PII Redacted"
-        value="1,892"
-        trend={{ label: '13.2%', direction: 'up' }}
+        label="PII Sanitized"
+        value={totalSanitized.toLocaleString()}
+        trend={{ label: `${sanitizedPct}%`, direction: 'up' }}
       />
       <StatCard
-        label="Est. Cost Savings"
-        value={
-          <>
-            $4,200<span style={{ fontSize: '16px' }}>/mo</span>
-          </>
-        }
+        label="Total Jobs"
+        value={jobs.length.toLocaleString()}
         highlight
       />
     </div>

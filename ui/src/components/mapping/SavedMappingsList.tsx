@@ -165,8 +165,26 @@ export function SavedMappingsList({ onViewMapping }: SavedMappingsListProps) {
                 >
                   ID: {mapping.mapping_id}
                 </div>
-                <div style={{ display: 'flex', gap: '16px' }}>
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                   <span>{Object.keys(mapping.fields).length} field{Object.keys(mapping.fields).length !== 1 ? 's' : ''}</span>
+                  {mapping.source_format && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '1px 8px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        borderRadius: '9999px',
+                        backgroundColor: 'var(--bg-subtle)',
+                        border: '1px solid var(--border-color)',
+                        color: 'var(--text-secondary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      {mapping.source_format}
+                    </span>
+                  )}
                   <span>Default: {mapping.default_action}</span>
                   <span>{new Date(mapping.created_at).toLocaleDateString()}</span>
                 </div>

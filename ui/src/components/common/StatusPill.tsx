@@ -1,4 +1,4 @@
-type StatusVariant = 'success' | 'danger';
+type StatusVariant = 'success' | 'danger' | 'warning' | 'neutral';
 
 interface StatusPillProps {
   label: string;
@@ -13,6 +13,14 @@ const VARIANT_STYLES: Record<StatusVariant, { backgroundColor: string; color: st
   danger: {
     backgroundColor: 'var(--danger-bg)',
     color: 'var(--danger-color)',
+  },
+  warning: {
+    backgroundColor: 'var(--warning-bg)',
+    color: 'var(--warning-color)',
+  },
+  neutral: {
+    backgroundColor: '#f1f5f9',
+    color: '#64748b',
   },
 };
 

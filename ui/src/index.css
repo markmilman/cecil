@@ -25,6 +25,9 @@
   --danger-color: #EF4444;
   --danger-bg: #FEF2F2;
   --danger-border: #FECACA;
+  --warning-color: #F59E0B;
+  --warning-bg: #FFFBEB;
+  --warning-border: #FDE68A;
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --cta-gradient-start: #EEF2FF;
@@ -52,6 +55,9 @@
   --danger-color: #F87171;
   --danger-bg: #450A0A;
   --danger-border: #7F1D1D;
+  --warning-color: #FBBF24;
+  --warning-bg: #451A03;
+  --warning-border: #78350F;
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
   --cta-gradient-start: #1E1B4B;
@@ -75,6 +81,23 @@
 
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
+}
+
+/* ============================================
+   slideInRight Animation
+   ============================================ */
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.25s ease-out;
 }
 
 /* ============================================

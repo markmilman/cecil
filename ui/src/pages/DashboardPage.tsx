@@ -1,8 +1,16 @@
+import { useState, useEffect } from 'react';
 import { StatsGrid } from '@/components/dashboard/StatsGrid';
 import { JobHistoryTable } from '@/components/dashboard/JobHistoryTable';
+import { JobDetailDrawer } from '@/components/dashboard/JobDetailDrawer';
+import { useJobList } from '@/hooks/useJobList';
+
+import type { JobRecord } from '@/types';
+
+const POLL_INTERVAL_MS = 10_000;
 
 interface DashboardPageProps {
   onStartWizard: () => void;
+  onViewMapping?: (mappingId: string) => void;
 }
 
 /**
@@ -10,8 +18,19 @@ interface DashboardPageProps {
  *
  * Displays a page header with title/subtitle and a "+ New Sanitization
  * Job" primary button, followed by the stats grid and job history table.
+ * Fetches real job data via the useJobList hook with 10-second polling.
  */
-export function DashboardPage({ onStartWizard }: DashboardPageProps) {
+export function DashboardPage({ onStartWizard, onViewMapping }: DashboardPageProps) {
+  const { jobs, isLoading, error, refresh, deleteJobById } = useJobList();
+  const [selectedJob, setSelectedJob] = useState<JobRecord | null>(null);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      refresh();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [refresh]);
+
   return (
     <div>
       <div
@@ -51,9 +70,24 @@ export function DashboardPage({ onStartWizard }: DashboardPageProps) {
         </button>
       </div>
 
-      <StatsGrid />
+      <StatsGrid jobs={jobs} />
 
-      <JobHistoryTable />
+      <JobHistoryTable
+        jobs={jobs}
+        isLoading={isLoading}
+        error={error}
+        onDeleteJob={deleteJobById}
+        onJobClick={setSelectedJob}
+      />
+
+      <JobDetailDrawer
+        job={selectedJob}
+        onClose={() => setSelectedJob(null)}
+        onViewMapping={onViewMapping ? (mappingId) => {
+          setSelectedJob(null);
+          onViewMapping(mappingId);
+        } : undefined}
+      />
     </div>
   );
 }

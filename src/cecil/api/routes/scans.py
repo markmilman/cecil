@@ -19,6 +19,7 @@ from uuid import uuid4
 from fastapi import APIRouter, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
+from cecil.api.routes.jobs import _persist_job
 from cecil.api.schemas import (
     ErrorResponse,
     FileFormat,
@@ -263,11 +264,15 @@ def _execute_sanitize(
     file_format: FileFormat,
     mapping_config: MappingConfig,
     output_path: str,
+    mapping_id: str | None = None,
+    mapping_name: str | None = None,
 ) -> None:
     """Execute sanitization as a background task.
 
     Connects to the provider, streams records through the sanitization
-    engine, and writes sanitized output to the JSONL writer.
+    engine, and writes sanitized output to the JSONL writer.  On
+    completion (success or failure), a persistent job record is written
+    to ``~/.cecil/jobs/``.
 
     Args:
         scan_id: The unique scan identifier.
@@ -275,6 +280,8 @@ def _execute_sanitize(
         file_format: The resolved file format.
         mapping_config: The mapping configuration for the strategy.
         output_path: The output file path.
+        mapping_id: Optional mapping ID used for the sanitization.
+        mapping_name: Optional human-readable mapping name.
     """
     state = _scan_store[scan_id]
     state.status = ScanStatus.RUNNING
@@ -334,6 +341,25 @@ def _execute_sanitize(
         writer.close()
         provider.close()
 
+        # Persist the job record to disk.
+        _persist_job(
+            {
+                "job_id": scan_id,
+                "status": state.status.value,
+                "source": source,
+                "source_format": file_format.value,
+                "mapping_id": mapping_id,
+                "mapping_name": mapping_name,
+                "output_path": output_path,
+                "records_processed": state.records_processed,
+                "records_sanitized": state.records_sanitized,
+                "records_failed": state.records_failed,
+                "errors": list(state.errors),
+                "created_at": state.created_at.isoformat(),
+                "completed_at": datetime.now(tz=UTC).isoformat(),
+            }
+        )
+
 
 @router.post(
     "/sanitize",
@@ -385,6 +411,8 @@ async def sanitize(
 
     # Resolve mapping.
     mapping_config: MappingConfig | None = None
+    mapping_id: str | None = None
+    mapping_name: str | None = None
     if request.mapping_id:
         from cecil.api.routes.mappings import _mapping_store
 
@@ -398,6 +426,8 @@ async def sanitize(
                 ).model_dump(),
             )
         mapping_config = mapping_state.config
+        mapping_id = request.mapping_id
+        mapping_name = mapping_state.name
     elif request.mapping_yaml_path:
         try:
             yaml_path = Path(request.mapping_yaml_path).expanduser().resolve()
@@ -432,8 +462,10 @@ async def sanitize(
         )
 
     # Build output path (expand tilde).
+    # Include the scan ID so each run gets its own unique file.
     output_dir = Path(request.output_dir).expanduser().resolve()
-    output_path = output_dir / f"{resolved.stem}_sanitized.jsonl"
+    scan_id = str(uuid4())
+    output_path = output_dir / f"{resolved.stem}_sanitized_{scan_id[:8]}.jsonl"
 
     # Ensure output directory exists.
     try:
@@ -447,8 +479,7 @@ async def sanitize(
             ).model_dump(),
         )
 
-    # Create scan state.
-    scan_id = str(uuid4())
+    # Create scan state (scan_id already generated above for the output filename).
     state = ScanState(
         scan_id=scan_id,
         status=ScanStatus.PENDING,
@@ -467,6 +498,8 @@ async def sanitize(
         detected,
         mapping_config,
         str(output_path),
+        mapping_id,
+        mapping_name,
     )
 
     return SanitizeResponse(

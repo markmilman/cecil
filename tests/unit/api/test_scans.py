@@ -432,7 +432,8 @@ class TestSanitize:
         body = response.json()
         assert "scan_id" in body
         assert body["status"] in ("pending", "completed")
-        assert body["output_path"].endswith("_sanitized.jsonl")
+        assert "_sanitized_" in body["output_path"]
+        assert body["output_path"].endswith(".jsonl")
 
     def test_sanitize_valid_with_yaml_path_returns_201(
         self,
@@ -456,7 +457,8 @@ class TestSanitize:
         assert response.status_code == 201
         body = response.json()
         assert "scan_id" in body
-        assert body["output_path"].endswith("_sanitized.jsonl")
+        assert "_sanitized_" in body["output_path"]
+        assert body["output_path"].endswith(".jsonl")
 
     def test_sanitize_nonexistent_source_returns_404(
         self,
@@ -600,6 +602,48 @@ class TestSanitize:
         # Verify the output file was written successfully.
         output_path = Path(response.json()["output_path"])
         assert output_path.is_file()
+
+    def test_sanitize_same_source_twice_produces_different_output_files(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Two sanitization runs of the same source must write to different output files.
+
+        Each scan includes a timestamp in the output filename so that
+        successive runs never overwrite previous results.
+        """
+        jsonl_file = _create_jsonl_file(tmp_path, records=2)
+        yaml_file = _create_mapping_yaml(tmp_path)
+        output_dir = tmp_path / "output"
+
+        resp1 = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+        resp2 = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(jsonl_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+
+        assert resp1.status_code == 201
+        assert resp2.status_code == 201
+
+        path1 = resp1.json()["output_path"]
+        path2 = resp2.json()["output_path"]
+        assert path1 != path2, "Two scans of the same source must produce different output paths"
+
+        # Both output files should exist.
+        assert Path(path1).is_file()
+        assert Path(path2).is_file()
 
 
 class TestCancelScan:

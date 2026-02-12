@@ -34,7 +34,7 @@ interface UseMappingReturn extends UseMappingState {
   setDefaultAction: (action: RedactionAction) => void;
   validate: () => Promise<void>;
   preview: () => Promise<void>;
-  save: (name?: string) => Promise<void>;
+  save: (name?: string, sourcePath?: string, sourceFormat?: string) => Promise<void>;
   reset: () => void;
   dismissValidation: () => void;
   dismissPreview: () => void;
@@ -161,7 +161,7 @@ export function useMapping(source?: string): UseMappingReturn {
     }
   }, [state.fields, state.fieldOptions, state.sampleRecord]);
 
-  const save = useCallback(async (name?: string) => {
+  const save = useCallback(async (name?: string, sourcePath?: string, sourceFormat?: string) => {
     setState((prev) => ({ ...prev, isSaving: true, error: null }));
     try {
       const fieldsPayload: Record<string, { action: RedactionAction; options: Record<string, string> }> = {};
@@ -175,6 +175,8 @@ export function useMapping(source?: string): UseMappingReturn {
         version: 1,
         default_action: state.defaultAction,
         fields: fieldsPayload,
+        source_format: sourceFormat || null,
+        source_path: sourcePath || null,
       }, name);
       setState((prev) => ({
         ...prev,

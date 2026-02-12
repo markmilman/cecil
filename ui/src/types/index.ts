@@ -156,6 +156,8 @@ export interface MappingConfigRequest {
   default_action: RedactionAction;
   fields: Record<string, FieldMappingEntry>;
   name?: string;
+  source_format?: string | null;
+  source_path?: string | null;
 }
 
 /**
@@ -171,6 +173,8 @@ export interface MappingConfigResponse {
   created_at: string;
   yaml_path?: string | null;
   name: string;
+  source_format?: string | null;
+  source_path?: string | null;
 }
 
 /**
@@ -240,4 +244,23 @@ export interface SanitizeResponse {
   records_sanitized: number;
   records_failed: number;
   created_at: string;
+}
+
+/**
+ * A completed or in-progress sanitization job record
+ */
+export interface JobRecord {
+  job_id: string;
+  status: ScanStatus;
+  source: string;
+  source_format: string;
+  mapping_id: string | null;
+  mapping_name: string | null;
+  output_path: string;
+  records_processed: number;
+  records_sanitized: number;
+  records_failed: number;
+  errors: string[];
+  created_at: string;  // ISO 8601
+  completed_at: string | null;  // ISO 8601
 }

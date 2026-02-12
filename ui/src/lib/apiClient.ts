@@ -13,6 +13,7 @@ import type {
   SampleRecordResponse,
   SanitizeRequest,
   SanitizeResponse,
+  JobRecord,
 } from '@/types';
 
 /**
@@ -397,6 +398,39 @@ export class ApiClient {
       path: string;
     }>('/api/v1/filesystem/read-jsonl', { path, offset, limit });
     return response.data;
+  }
+
+  /**
+   * List all sanitization job records
+   *
+   * @returns Array of job records
+   * @throws {ApiClientError} If the request fails
+   */
+  async listJobs(): Promise<JobRecord[]> {
+    const response = await this.client.get<JobRecord[]>('/api/v1/jobs/');
+    return response.data;
+  }
+
+  /**
+   * Get a specific job record by ID
+   *
+   * @param jobId - Unique job identifier
+   * @returns Job record
+   * @throws {ApiClientError} If the job is not found
+   */
+  async getJob(jobId: string): Promise<JobRecord> {
+    const response = await this.client.get<JobRecord>(`/api/v1/jobs/${jobId}`);
+    return response.data;
+  }
+
+  /**
+   * Delete a job record
+   *
+   * @param jobId - Unique job identifier
+   * @throws {ApiClientError} If the deletion fails
+   */
+  async deleteJob(jobId: string): Promise<void> {
+    await this.client.delete(`/api/v1/jobs/${jobId}`);
   }
 
   /**

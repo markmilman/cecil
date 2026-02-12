@@ -259,6 +259,10 @@ class MappingConfigRequest(BaseModel):
         default=None,
         description="Human-readable name for the mapping (auto-generated if not provided)",
     )
+    source_format: str | None = Field(
+        default=None,
+        description="File format the mapping was created from (e.g., csv, jsonl)",
+    )
 
 
 class MappingConfigResponse(BaseModel):
@@ -279,6 +283,14 @@ class MappingConfigResponse(BaseModel):
         description="Path to the persisted YAML file on disk (if saved)",
     )
     name: str = Field(description="Human-readable name for the mapping")
+    source_format: str | None = Field(
+        default=None,
+        description="File format the mapping was created from (e.g., csv, jsonl)",
+    )
+    source_path: str | None = Field(
+        default=None,
+        description="Path to the source file the mapping was created from",
+    )
 
 
 class MappingValidationRequest(BaseModel):
@@ -409,6 +421,33 @@ class LoadMappingYamlContentRequest(BaseModel):
     name: str | None = Field(
         default=None,
         description="Human-readable name for the mapping (auto-generated if not provided)",
+    )
+
+
+class JobRecord(BaseModel):
+    """Persistent record of a completed sanitization job."""
+
+    job_id: str = Field(description="Unique job identifier (matches scan_id)")
+    status: ScanStatus = Field(description="Final job status")
+    source: str = Field(description="Source file path")
+    source_format: str = Field(description="File format of the source")
+    mapping_id: str | None = Field(default=None, description="Mapping ID used for sanitization")
+    mapping_name: str | None = Field(
+        default=None,
+        description="Human-readable name of the mapping used",
+    )
+    output_path: str = Field(description="Path to the sanitized output file")
+    records_processed: int = Field(default=0, description="Total records processed")
+    records_sanitized: int = Field(default=0, description="Records successfully sanitized")
+    records_failed: int = Field(default=0, description="Records that failed sanitization")
+    errors: list[str] = Field(
+        default_factory=list,
+        description="List of errors encountered during the job",
+    )
+    created_at: datetime = Field(description="Timestamp when the job started")
+    completed_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when the job finished",
     )
 
 
