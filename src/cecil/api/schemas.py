@@ -410,3 +410,29 @@ class LoadMappingYamlContentRequest(BaseModel):
         default=None,
         description="Human-readable name for the mapping (auto-generated if not provided)",
     )
+
+
+class PreviewOutputRequest(BaseModel):
+    """Request payload for previewing an output JSONL file."""
+
+    path: str = Field(description="Path to the output JSONL file")
+    offset: int = Field(default=0, description="Number of records to skip")
+    limit: int = Field(default=50, description="Maximum number of records to return")
+
+    @field_validator("path")
+    @classmethod
+    def validate_path_non_empty(cls, v: str) -> str:
+        """Validate that path is not an empty string."""
+        if not v or not v.strip():
+            raise ValueError("path must be a non-empty string")
+        return v
+
+
+class PreviewOutputResponse(BaseModel):
+    """Response payload containing a preview of sanitized output records."""
+
+    records: list[dict[str, str]] = Field(
+        description="List of records from the output file",
+    )
+    total_count: int = Field(description="Total number of records in the file")
+    path: str = Field(description="Path to the output file")

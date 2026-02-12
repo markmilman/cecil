@@ -8,6 +8,7 @@ path traversal and symlink escape attacks.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
@@ -26,6 +27,8 @@ from cecil.api.schemas import (
     FilesystemEntry,
     OpenDirectoryRequest,
     OpenDirectoryResponse,
+    PreviewOutputRequest,
+    PreviewOutputResponse,
     UploadedFileInfo,
     UploadResponse,
 )
@@ -449,3 +452,122 @@ async def open_directory(
             success=False,
             message=f"File manager not available: {cmd[0]} not found",
         )
+
+
+@router.post(
+    "/read-jsonl",
+    response_model=PreviewOutputResponse,
+    responses={
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+async def preview_output(
+    request: PreviewOutputRequest,
+) -> PreviewOutputResponse | JSONResponse:
+    """Read and return a preview of a sanitized output file.
+
+    Returns up to `limit` records from the output JSONL file for UI display.
+    This endpoint reads SANITIZED output only — the data has already been
+    through the privacy pipeline, so it's safe to return to the UI.
+
+    Args:
+        request: The preview request with path, offset, and limit.
+
+    Returns:
+        A PreviewOutputResponse with records and metadata,
+        or a JSONResponse with an error payload for validation failures.
+    """
+    # Expand tilde in the path.
+    try:
+        file_path = Path(request.path).expanduser().resolve(strict=True)
+    except OSError:
+        return JSONResponse(
+            status_code=404,
+            content=ErrorResponse(
+                error="file_not_found",
+                message="Output file does not exist or is not accessible",
+            ).model_dump(),
+        )
+
+    # Verify it's a file, not a directory.
+    if not file_path.is_file():
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="not_a_file",
+                message="Path is not a file",
+            ).model_dump(),
+        )
+
+    # Verify read permission.
+    if not os.access(file_path, os.R_OK):
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="permission_denied",
+                message="File is not readable",
+            ).model_dump(),
+        )
+
+    # Read the JSONL file line by line.
+    records: list[dict[str, str]] = []
+    total_count = 0
+    malformed_count = 0
+
+    try:
+        with file_path.open("r", encoding="utf-8") as f:
+            for line_num, line in enumerate(f, start=1):
+                line = line.strip()
+                if not line:
+                    # Skip empty lines.
+                    continue
+
+                total_count += 1
+
+                # Skip lines before the offset.
+                if total_count <= request.offset:
+                    continue
+
+                # Stop if we've reached the limit.
+                if len(records) >= request.limit:
+                    continue
+
+                # Parse the JSON line.
+                try:
+                    record = json.loads(line)
+                    # Ensure all values are strings for consistency.
+                    records.append({k: str(v) for k, v in record.items()})
+                except json.JSONDecodeError:
+                    malformed_count += 1
+                    logger.warning(
+                        "Skipping malformed JSON line in output file",
+                        extra={
+                            "line_number": line_num,
+                        },
+                    )
+                    continue
+
+    except OSError as err:
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="read_error",
+                message=f"Failed to read file: {type(err).__name__}",
+            ).model_dump(),
+        )
+
+    logger.info(
+        "Output file preview completed",
+        extra={
+            "total_count": total_count,
+            "returned_count": len(records),
+            "malformed_lines": malformed_count,
+        },
+    )
+
+    return PreviewOutputResponse(
+        records=records,
+        total_count=total_count,
+        path=str(file_path),
+    )

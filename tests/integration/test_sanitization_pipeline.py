@@ -528,3 +528,181 @@ class TestSanitizeWithLargeFile:
             assert record["email"] == "[EMAIL_REDACTED]"
             assert record["name"] == "[NAME_REDACTED]"
             assert record["id"] == i
+
+
+class TestPreviewOutputEndpoint:
+    """Tests for the /api/v1/filesystem/read-jsonl endpoint."""
+
+    def test_preview_output_returns_records(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Preview endpoint returns records from a sanitized output file."""
+        # Create a sanitized output file
+        records = [
+            {"email": "[EMAIL_REDACTED]", "name": "[NAME_REDACTED]", "id": "1"},
+            {"email": "[EMAIL_REDACTED]", "name": "[NAME_REDACTED]", "id": "2"},
+            {"email": "[EMAIL_REDACTED]", "name": "[NAME_REDACTED]", "id": "3"},
+        ]
+        output_file = tmp_path / "sanitized_output.jsonl"
+        output_file.write_text("\n".join(json.dumps(r) for r in records) + "\n")
+
+        # Request preview
+        response = client.post(
+            "/api/v1/filesystem/read-jsonl",
+            json={
+                "path": str(output_file),
+                "offset": 0,
+                "limit": 50,
+            },
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total_count"] == 3
+        assert len(body["records"]) == 3
+        assert body["path"] == str(output_file)
+
+        # Verify records content
+        assert body["records"][0]["id"] == "1"
+        assert body["records"][1]["id"] == "2"
+        assert body["records"][2]["id"] == "3"
+
+    def test_preview_output_with_pagination(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Preview endpoint supports offset and limit pagination."""
+        # Create a file with 10 records
+        records = [{"id": str(i)} for i in range(10)]
+        output_file = tmp_path / "output.jsonl"
+        output_file.write_text("\n".join(json.dumps(r) for r in records) + "\n")
+
+        # Request with offset and limit
+        response = client.post(
+            "/api/v1/filesystem/read-jsonl",
+            json={
+                "path": str(output_file),
+                "offset": 3,
+                "limit": 2,
+            },
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total_count"] == 10
+        assert len(body["records"]) == 2
+        assert body["records"][0]["id"] == "3"
+        assert body["records"][1]["id"] == "4"
+
+    def test_preview_output_with_nonexistent_file_returns_404(
+        self,
+        client: TestClient,
+    ) -> None:
+        """Preview endpoint returns 404 for nonexistent files."""
+        response = client.post(
+            "/api/v1/filesystem/read-jsonl",
+            json={
+                "path": "/nonexistent/file.jsonl",
+                "offset": 0,
+                "limit": 50,
+            },
+        )
+
+        assert response.status_code == 404
+        body = response.json()
+        assert body["error"] == "file_not_found"
+
+    def test_preview_output_skips_malformed_json_lines(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Preview endpoint skips malformed JSON lines gracefully."""
+        # Create a file with valid and malformed lines
+        lines = [
+            '{"id": "1", "value": "valid"}',
+            "this is not json",
+            '{"id": "2", "value": "also valid"}',
+            "{incomplete json",
+            '{"id": "3", "value": "third valid"}',
+        ]
+        output_file = tmp_path / "output.jsonl"
+        output_file.write_text("\n".join(lines) + "\n")
+
+        response = client.post(
+            "/api/v1/filesystem/read-jsonl",
+            json={
+                "path": str(output_file),
+                "offset": 0,
+                "limit": 50,
+            },
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        # Total count includes all non-empty lines (valid + malformed)
+        assert body["total_count"] == 5
+        # But only valid records are returned
+        assert len(body["records"]) == 3
+        assert body["records"][0]["id"] == "1"
+        assert body["records"][1]["id"] == "2"
+        assert body["records"][2]["id"] == "3"
+
+    def test_preview_output_with_empty_file(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Preview endpoint handles empty files."""
+        output_file = tmp_path / "empty.jsonl"
+        output_file.write_text("")
+
+        response = client.post(
+            "/api/v1/filesystem/read-jsonl",
+            json={
+                "path": str(output_file),
+                "offset": 0,
+                "limit": 50,
+            },
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total_count"] == 0
+        assert len(body["records"]) == 0
+
+    def test_preview_output_expands_tilde_path(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Preview endpoint expands tilde in file paths."""
+        # Create a file in home directory
+        home_dir = Path.home()
+        output_file = home_dir / "test_output.jsonl"
+        try:
+            records = [{"id": "1", "value": "test"}]
+            output_file.write_text("\n".join(json.dumps(r) for r in records) + "\n")
+
+            # Use tilde path
+            response = client.post(
+                "/api/v1/filesystem/read-jsonl",
+                json={
+                    "path": "~/test_output.jsonl",
+                    "offset": 0,
+                    "limit": 50,
+                },
+            )
+
+            assert response.status_code == 200
+            body = response.json()
+            assert body["total_count"] == 1
+            assert len(body["records"]) == 1
+            assert body["records"][0]["id"] == "1"
+        finally:
+            # Clean up
+            if output_file.exists():
+                output_file.unlink()
