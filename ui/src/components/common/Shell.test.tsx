@@ -92,7 +92,7 @@ describe('Shell', () => {
     renderShell();
     const settingsLink = screen.getByText('Settings');
     expect(settingsLink).toHaveAttribute('title', 'Coming soon');
-    expect(settingsLink).toBeDisabled();
+    expect(settingsLink).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('calls onNavigate when Mapping Rules is clicked', () => {
