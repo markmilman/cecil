@@ -67,7 +67,7 @@ export function App() {
     setWizardMappingId(null);
   }, []);
 
-  const handleViewResults = useCallback((source: string, scanId: string) => {
+  const handleViewResults = useCallback((source: string, _scanId: string) => {
     setMappingSource(source);
     setActiveView('mapping');
   }, []);
