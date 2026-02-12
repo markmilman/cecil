@@ -1,20 +1,86 @@
 /**
  * MappingViewer component
  *
- * Displays a read-only view of a saved mapping configuration.
- * Shows field mappings, actions, and metadata.
+ * Displays an editable view of a saved mapping configuration.
+ * Allows editing the name, default action, and per-field actions.
  */
 
-import { ArrowLeftIcon, FileTextIcon } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeftIcon, FileTextIcon, SaveIcon, CheckCircleIcon } from 'lucide-react';
 
-import type { MappingConfigResponse } from '@/types';
+import { ActionSelector } from '@/components/mapping/ActionSelector';
+import { apiClient } from '@/lib/apiClient';
+import { RedactionAction } from '@/types';
+
+import type { MappingConfigResponse, FieldMappingEntry } from '@/types';
 
 interface MappingViewerProps {
   mapping: MappingConfigResponse;
   onBack: () => void;
+  onSaved?: () => void;
 }
 
-export function MappingViewer({ mapping, onBack }: MappingViewerProps) {
+export function MappingViewer({ mapping, onBack, onSaved }: MappingViewerProps) {
+  const [editedName, setEditedName] = useState(mapping.name);
+  const [editedDefaultAction, setEditedDefaultAction] = useState<RedactionAction>(
+    mapping.default_action as unknown as RedactionAction,
+  );
+  const [editedActions, setEditedActions] = useState<Record<string, RedactionAction>>(() => {
+    const actions: Record<string, RedactionAction> = {};
+    for (const [fieldName, fieldEntry] of Object.entries(mapping.fields)) {
+      actions[fieldName] = fieldEntry.action as unknown as RedactionAction;
+    }
+    return actions;
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const hasChanges =
+    editedName !== mapping.name ||
+    editedDefaultAction !== (mapping.default_action as unknown as RedactionAction) ||
+    Object.entries(editedActions).some(([fieldName, action]) => {
+      const originalAction = mapping.fields[fieldName]?.action as unknown as RedactionAction;
+      return action !== originalAction;
+    });
+
+  const handleActionChange = (fieldName: string, action: RedactionAction) => {
+    setEditedActions((prev) => ({ ...prev, [fieldName]: action }));
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    try {
+      const fields: Record<string, FieldMappingEntry> = {};
+      for (const [fieldName, action] of Object.entries(editedActions)) {
+        fields[fieldName] = {
+          action,
+          options: mapping.fields[fieldName]?.options || {},
+        };
+      }
+
+      await apiClient.updateMapping(mapping.mapping_id, {
+        version: mapping.version,
+        default_action: editedDefaultAction,
+        fields,
+        name: editedName,
+      });
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+
+      if (onSaved) {
+        onSaved();
+      }
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save changes');
+    } finally {
+      setIsSaving(false);
+    }
+  };
   return (
     <div>
       {/* Header */}
@@ -22,17 +88,22 @@ export function MappingViewer({ mapping, onBack }: MappingViewerProps) {
         className="flex items-center justify-between"
         style={{ marginBottom: '24px' }}
       >
-        <div>
-          <h2
+        <div style={{ flex: 1, marginRight: '16px' }}>
+          <input
+            type="text"
+            value={editedName}
+            onChange={(e) => setEditedName(e.target.value)}
             style={{
-              margin: 0,
               fontSize: '24px',
-              color: 'var(--text-primary)',
               fontWeight: 700,
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '4px',
+              padding: '4px 8px',
+              width: '100%',
+              maxWidth: '500px',
             }}
-          >
-            {mapping.name}
-          </h2>
+          />
           <p
             style={{
               margin: '4px 0 0',
@@ -40,18 +111,59 @@ export function MappingViewer({ mapping, onBack }: MappingViewerProps) {
               fontSize: '14px',
             }}
           >
-            View saved mapping rules and field actions.
+            Edit mapping name, default action, and field actions.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={onBack}
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
-          Back
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={!hasChanges || isSaving}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            {saveSuccess ? (
+              <>
+                <CheckCircleIcon className="h-4 w-4" />
+                Saved
+              </>
+            ) : (
+              <>
+                <SaveIcon className="h-4 w-4" />
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onBack}
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            Back
+          </button>
+        </div>
       </div>
+
+      {saveError && (
+        <div
+          style={{
+            padding: '12px 16px',
+            backgroundColor: 'var(--danger-bg)',
+            border: '1px solid var(--danger-border)',
+            borderRadius: '8px',
+            color: 'var(--danger-color)',
+            fontSize: '14px',
+            marginBottom: '16px',
+          }}
+        >
+          {saveError}
+        </div>
+      )}
 
       {/* Mapping metadata */}
       <div
@@ -107,10 +219,19 @@ export function MappingViewer({ mapping, onBack }: MappingViewerProps) {
             </span>
           </div>
           <div>
-            <span style={{ color: 'var(--text-secondary)' }}>Default Action:</span>{' '}
-            <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-              {mapping.default_action}
+            <span
+              style={{
+                color: 'var(--text-secondary)',
+                display: 'block',
+                marginBottom: '4px',
+              }}
+            >
+              Default Action:
             </span>
+            <ActionSelector
+              value={editedDefaultAction}
+              onChange={setEditedDefaultAction}
+            />
           </div>
           <div>
             <span style={{ color: 'var(--text-secondary)' }}>Fields:</span>{' '}
@@ -249,32 +370,10 @@ export function MappingViewer({ mapping, onBack }: MappingViewerProps) {
                     fontSize: '14px',
                   }}
                 >
-                  <span
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      fontWeight: 500,
-                      backgroundColor:
-                        fieldEntry.action === 'redact'
-                          ? '#fef2f2'
-                          : fieldEntry.action === 'mask'
-                          ? '#fff7ed'
-                          : fieldEntry.action === 'hash'
-                          ? '#f3f4f6'
-                          : '#f0fdf4',
-                      color:
-                        fieldEntry.action === 'redact'
-                          ? '#991b1b'
-                          : fieldEntry.action === 'mask'
-                          ? '#9a3412'
-                          : fieldEntry.action === 'hash'
-                          ? '#374151'
-                          : '#166534',
-                    }}
-                  >
-                    {fieldEntry.action.toUpperCase()}
-                  </span>
+                  <ActionSelector
+                    value={editedActions[fieldName]}
+                    onChange={(action) => handleActionChange(fieldName, action)}
+                  />
                 </td>
                 <td
                   style={{

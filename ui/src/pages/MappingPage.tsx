@@ -6,7 +6,7 @@
  * guiding users to upload data first, along with a list of saved mappings.
  */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { MappingEditor } from '@/components/mapping/MappingEditor';
 import { MappingEmptyState } from '@/components/mapping/MappingEmptyState';
 import { SavedMappingsList } from '@/components/mapping/SavedMappingsList';
@@ -28,6 +28,11 @@ export function MappingPage({
   onMappingComplete,
 }: MappingPageProps) {
   const [viewingMapping, setViewingMapping] = useState<MappingConfigResponse | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleMappingSaved = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
 
   if (source) {
     return (
@@ -44,6 +49,7 @@ export function MappingPage({
       <MappingViewer
         mapping={viewingMapping}
         onBack={() => setViewingMapping(null)}
+        onSaved={handleMappingSaved}
       />
     );
   }
@@ -53,7 +59,7 @@ export function MappingPage({
       <MappingEmptyState onStartWizard={onStartWizard || (() => {})} />
 
       <div style={{ marginTop: '32px' }}>
-        <SavedMappingsList onViewMapping={setViewingMapping} />
+        <SavedMappingsList key={refreshKey} onViewMapping={setViewingMapping} />
       </div>
     </div>
   );

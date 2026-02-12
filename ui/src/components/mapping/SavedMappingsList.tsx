@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { EyeIcon, TrashIcon, Loader2Icon, AlertCircleIcon, FileTextIcon, FolderOpenIcon } from 'lucide-react';
+import { PencilIcon, TrashIcon, Loader2Icon, AlertCircleIcon, FileTextIcon, FolderOpenIcon } from 'lucide-react';
 import { useMappingList } from '@/hooks/useMappingList';
 import { apiClient } from '@/lib/apiClient';
 
@@ -199,8 +199,8 @@ export function SavedMappingsList({ onViewMapping }: SavedMappingsListProps) {
                   gap: '6px',
                 }}
               >
-                <EyeIcon className="h-4 w-4" />
-                View
+                <PencilIcon className="h-4 w-4" />
+                View / Edit
               </button>
 
               <button
