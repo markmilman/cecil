@@ -25,6 +25,7 @@ from cecil.api.schemas import (
     FieldPreviewEntry,
     FieldPreviewRequest,
     FieldPreviewResponse,
+    LoadMappingYamlContentRequest,
     LoadMappingYamlRequest,
     MappingConfigRequest,
     MappingConfigResponse,
@@ -61,28 +62,31 @@ class MappingState:
         config: The validated domain MappingConfig.
         created_at: Timestamp when the mapping was created.
         yaml_path: Path to the persisted YAML file on disk (if saved).
+        name: Human-readable name for the mapping.
     """
 
     mapping_id: str
     config: MappingConfig
     created_at: datetime
     yaml_path: str | None = None
+    name: str | None = None
 
 
 # In-memory mapping store keyed by mapping_id.
 _mapping_store: dict[str, MappingState] = {}
 
 
-def _mapping_config_to_dict(config: MappingConfig) -> dict[str, Any]:
+def _mapping_config_to_dict(config: MappingConfig, name: str | None = None) -> dict[str, Any]:
     """Serialize a MappingConfig to a YAML-safe dictionary.
 
     Args:
         config: The domain MappingConfig to serialize.
+        name: Optional human-readable name for the mapping.
 
     Returns:
         A dictionary suitable for YAML serialization.
     """
-    return {
+    result: dict[str, Any] = {
         "version": config.version,
         "default_action": config.default_action.value,
         "fields": {
@@ -90,6 +94,9 @@ def _mapping_config_to_dict(config: MappingConfig) -> dict[str, Any]:
             for name, entry in config.fields.items()
         },
     }
+    if name is not None:
+        result["name"] = name
+    return result
 
 
 def _get_mappings_dir() -> Path:
@@ -103,12 +110,15 @@ def _get_mappings_dir() -> Path:
     return mappings_dir
 
 
-def _persist_mapping_to_yaml(mapping_id: str, config: MappingConfig) -> str:
+def _persist_mapping_to_yaml(
+    mapping_id: str, config: MappingConfig, name: str | None = None
+) -> str:
     """Persist a mapping configuration to a YAML file on disk.
 
     Args:
         mapping_id: The unique mapping identifier.
         config: The domain MappingConfig to persist.
+        name: Optional human-readable name for the mapping.
 
     Returns:
         The absolute path to the saved YAML file.
@@ -119,7 +129,7 @@ def _persist_mapping_to_yaml(mapping_id: str, config: MappingConfig) -> str:
     mappings_dir = _get_mappings_dir()
     yaml_path = mappings_dir / f"{mapping_id}.yaml"
 
-    mapping_dict = _mapping_config_to_dict(config)
+    mapping_dict = _mapping_config_to_dict(config, name)
 
     try:
         with yaml_path.open("w", encoding="utf-8") as f:
@@ -159,12 +169,24 @@ def _load_mappings_from_disk() -> None:
             # Extract mapping_id from filename (strip .yaml extension)
             mapping_id = yaml_file.stem
 
+            # Read raw YAML to extract name if present
+            with yaml_file.open("r", encoding="utf-8") as f:
+                raw_data = yaml.safe_load(f)
+
+            # Extract name from YAML (generate default if not present)
+            name = raw_data.get("name") if isinstance(raw_data, dict) else None
+            if name is None:
+                # Use file modification time for default name
+                stat = yaml_file.stat()
+                created_at = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
+                name = f"Mapping {created_at.strftime('%Y-%m-%d %H:%M')}"
+            else:
+                # Use file modification time as created_at
+                stat = yaml_file.stat()
+                created_at = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
+
             # Parse the YAML file
             config = parser.parse_file(yaml_file)
-
-            # Use file modification time as created_at
-            stat = yaml_file.stat()
-            created_at = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
 
             # Store in memory
             _mapping_store[mapping_id] = MappingState(
@@ -172,6 +194,7 @@ def _load_mappings_from_disk() -> None:
                 config=config,
                 created_at=created_at,
                 yaml_path=str(yaml_file),
+                name=name,
             )
 
             loaded_count += 1
@@ -240,6 +263,7 @@ def _config_to_response(
     config: MappingConfig,
     created_at: datetime,
     yaml_path: str | None = None,
+    name: str | None = None,
 ) -> MappingConfigResponse:
     """Convert a domain MappingConfig to an API response.
 
@@ -248,16 +272,21 @@ def _config_to_response(
         config: The domain MappingConfig.
         created_at: When the mapping was created.
         yaml_path: Optional path to the persisted YAML file.
+        name: Optional human-readable name for the mapping.
 
     Returns:
         A MappingConfigResponse suitable for API serialization.
     """
     fields: dict[str, FieldMappingEntrySchema] = {}
-    for name, entry in config.fields.items():
-        fields[name] = FieldMappingEntrySchema(
+    for field_name, entry in config.fields.items():
+        fields[field_name] = FieldMappingEntrySchema(
             action=RedactionActionSchema(entry.action.value),
             options={k: str(v) for k, v in entry.options.items()},
         )
+
+    # Generate default name if not provided
+    if name is None:
+        name = f"Mapping {created_at.strftime('%Y-%m-%d %H:%M')}"
 
     return MappingConfigResponse(
         mapping_id=mapping_id,
@@ -267,6 +296,7 @@ def _config_to_response(
         policy_hash=config.policy_hash(),
         created_at=created_at,
         yaml_path=yaml_path,
+        name=name,
     )
 
 
@@ -320,8 +350,13 @@ async def create_mapping(
     mapping_id = str(uuid4())
     now = datetime.now(tz=UTC)
 
+    # Generate default name if not provided
+    name = request.name
+    if name is None:
+        name = f"Mapping {now.strftime('%Y-%m-%d %H:%M')}"
+
     # Persist to disk
-    yaml_path = _persist_mapping_to_yaml(mapping_id, config)
+    yaml_path = _persist_mapping_to_yaml(mapping_id, config, name)
 
     # Store in memory
     _mapping_store[mapping_id] = MappingState(
@@ -329,6 +364,7 @@ async def create_mapping(
         config=config,
         created_at=now,
         yaml_path=yaml_path,
+        name=name,
     )
 
     logger.info(
@@ -336,7 +372,7 @@ async def create_mapping(
         extra={"mapping_id": mapping_id, "field_count": len(config.fields)},
     )
 
-    return _config_to_response(mapping_id, config, now, yaml_path)
+    return _config_to_response(mapping_id, config, now, yaml_path, name)
 
 
 @router.get(
@@ -350,7 +386,9 @@ async def list_mappings() -> list[MappingConfigResponse]:
         A list of MappingConfigResponse objects for all stored mappings.
     """
     return [
-        _config_to_response(state.mapping_id, state.config, state.created_at, state.yaml_path)
+        _config_to_response(
+            state.mapping_id, state.config, state.created_at, state.yaml_path, state.name
+        )
         for state in _mapping_store.values()
     ]
 
@@ -390,6 +428,25 @@ async def load_mapping_yaml(
             ).model_dump(),
         )
 
+    # Read raw YAML to extract name if present
+    try:
+        with resolved.open("r", encoding="utf-8") as f:
+            raw_data = yaml.safe_load(f)
+    except yaml.YAMLError as err:
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="mapping_parse_error",
+                message=f"Invalid YAML syntax: {err}",
+            ).model_dump(),
+        )
+
+    # Extract name from YAML (generate default if not present)
+    now = datetime.now(tz=UTC)
+    name = raw_data.get("name") if isinstance(raw_data, dict) else None
+    if name is None:
+        name = f"Mapping {now.strftime('%Y-%m-%d %H:%M')}"
+
     try:
         config = MappingParser().parse_file(resolved)
     except CecilError as err:
@@ -402,12 +459,12 @@ async def load_mapping_yaml(
         )
 
     mapping_id = str(uuid4())
-    now = datetime.now(tz=UTC)
     _mapping_store[mapping_id] = MappingState(
         mapping_id=mapping_id,
         config=config,
         created_at=now,
         yaml_path=str(resolved),
+        name=name,
     )
 
     logger.info(
@@ -415,7 +472,92 @@ async def load_mapping_yaml(
         extra={"mapping_id": mapping_id, "field_count": len(config.fields)},
     )
 
-    return _config_to_response(mapping_id, config, now, str(resolved))
+    return _config_to_response(mapping_id, config, now, str(resolved), name)
+
+
+@router.post(
+    "/load-yaml-content",
+    response_model=MappingConfigResponse,
+    status_code=201,
+    responses={422: {"model": ErrorResponse}},
+)
+async def load_mapping_yaml_content(
+    request: LoadMappingYamlContentRequest,
+) -> MappingConfigResponse | JSONResponse:
+    """Load a mapping configuration from raw YAML content.
+
+    Parses the YAML content string, validates its structure, stores
+    the resulting MappingConfig in memory and persists to disk, and
+    returns the mapping response with its ID and policy hash.
+
+    Args:
+        request: The request containing the raw YAML content.
+
+    Returns:
+        A MappingConfigResponse with the loaded mapping, or an
+        error response if the content is invalid.
+    """
+    # Parse the YAML content
+    try:
+        raw_data = yaml.safe_load(request.content)
+    except yaml.YAMLError as err:
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="mapping_parse_error",
+                message=f"Invalid YAML syntax: {err}",
+            ).model_dump(),
+        )
+
+    if not isinstance(raw_data, dict):
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="mapping_parse_error",
+                message="YAML content must be a mapping (dict) at the top level",
+            ).model_dump(),
+        )
+
+    # Validate via MappingParser
+    try:
+        config = MappingParser().parse_dict(raw_data)
+    except CecilError as err:
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="mapping_parse_error",
+                message=str(err),
+            ).model_dump(),
+        )
+
+    mapping_id = str(uuid4())
+    now = datetime.now(tz=UTC)
+
+    # Use provided name or extract from YAML, or generate default
+    name = request.name
+    if name is None:
+        name = raw_data.get("name")
+    if name is None:
+        name = f"Mapping {now.strftime('%Y-%m-%d %H:%M')}"
+
+    # Persist to disk
+    yaml_path = _persist_mapping_to_yaml(mapping_id, config, name)
+
+    # Store in memory
+    _mapping_store[mapping_id] = MappingState(
+        mapping_id=mapping_id,
+        config=config,
+        created_at=now,
+        yaml_path=yaml_path,
+        name=name,
+    )
+
+    logger.info(
+        "Mapping loaded from YAML content",
+        extra={"mapping_id": mapping_id, "field_count": len(config.fields)},
+    )
+
+    return _config_to_response(mapping_id, config, now, yaml_path, name)
 
 
 @router.get(
@@ -441,7 +583,9 @@ async def get_mapping(mapping_id: str) -> MappingConfigResponse | JSONResponse:
                 message="No mapping found with the given ID",
             ).model_dump(),
         )
-    return _config_to_response(state.mapping_id, state.config, state.created_at, state.yaml_path)
+    return _config_to_response(
+        state.mapping_id, state.config, state.created_at, state.yaml_path, state.name
+    )
 
 
 @router.put(
@@ -494,10 +638,14 @@ async def update_mapping(
 
     state.config = config
 
+    # Update name if provided
+    if request.name is not None:
+        state.name = request.name
+
     # Update the YAML file on disk if it exists
     if state.yaml_path:
         try:
-            yaml_path = _persist_mapping_to_yaml(mapping_id, config)
+            yaml_path = _persist_mapping_to_yaml(mapping_id, config, state.name)
             state.yaml_path = yaml_path
         except OSError as err:
             logger.warning(
@@ -510,7 +658,9 @@ async def update_mapping(
         extra={"mapping_id": mapping_id, "field_count": len(config.fields)},
     )
 
-    return _config_to_response(state.mapping_id, state.config, state.created_at, state.yaml_path)
+    return _config_to_response(
+        state.mapping_id, state.config, state.created_at, state.yaml_path, state.name
+    )
 
 
 @router.delete(

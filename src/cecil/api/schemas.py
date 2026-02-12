@@ -255,6 +255,10 @@ class MappingConfigRequest(BaseModel):
     fields: dict[str, FieldMappingEntrySchema] = Field(
         description="Field-level redaction action assignments",
     )
+    name: str | None = Field(
+        default=None,
+        description="Human-readable name for the mapping (auto-generated if not provided)",
+    )
 
 
 class MappingConfigResponse(BaseModel):
@@ -274,6 +278,7 @@ class MappingConfigResponse(BaseModel):
         default=None,
         description="Path to the persisted YAML file on disk (if saved)",
     )
+    name: str = Field(description="Human-readable name for the mapping")
 
 
 class MappingValidationRequest(BaseModel):
@@ -395,3 +400,13 @@ class LoadMappingYamlRequest(BaseModel):
     """Request payload for loading a mapping from a YAML file."""
 
     path: str = Field(description="Path to the mapping.yaml file on disk")
+
+
+class LoadMappingYamlContentRequest(BaseModel):
+    """Request payload for loading a mapping from raw YAML content."""
+
+    content: str = Field(description="Raw YAML content of the mapping file")
+    name: str | None = Field(
+        default=None,
+        description="Human-readable name for the mapping (auto-generated if not provided)",
+    )

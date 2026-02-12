@@ -480,3 +480,285 @@ class TestLoadMappingByYamlPath:
         assert load_response.status_code == 422
         error_body = load_response.json()
         assert error_body["error"] == "mapping_parse_error"
+
+
+class TestMappingNameField:
+    """Tests for the name field in mapping configurations."""
+
+    def test_create_mapping_with_name(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """A mapping created with a name stores and returns it."""
+        payload = _valid_mapping_payload()
+        payload["name"] = "Production Mapping"
+
+        response = client.post("/api/v1/mappings/", json=payload)
+        assert response.status_code == 201
+        body = response.json()
+
+        # Name should be in the response
+        assert body["name"] == "Production Mapping"
+        mapping_id = body["mapping_id"]
+
+        # Name should be persisted in YAML
+        yaml_path = mappings_dir / f"{mapping_id}.yaml"
+        assert yaml_path.is_file()
+
+        with yaml_path.open("r", encoding="utf-8") as f:
+            saved_data = yaml.safe_load(f)
+
+        assert saved_data["name"] == "Production Mapping"
+
+    def test_create_mapping_without_name_generates_default(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """A mapping created without a name gets a default generated name."""
+        payload = _valid_mapping_payload()
+        # No name field provided
+
+        response = client.post("/api/v1/mappings/", json=payload)
+        assert response.status_code == 201
+        body = response.json()
+
+        # A default name should be generated
+        assert "name" in body
+        assert body["name"].startswith("Mapping ")
+        mapping_id = body["mapping_id"]
+
+        # Name should be persisted in YAML
+        yaml_path = mappings_dir / f"{mapping_id}.yaml"
+        assert yaml_path.is_file()
+
+        with yaml_path.open("r", encoding="utf-8") as f:
+            saved_data = yaml.safe_load(f)
+
+        assert "name" in saved_data
+        assert saved_data["name"].startswith("Mapping ")
+
+    def test_name_persists_across_reload(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """A mapping's name persists across server restart."""
+        payload = _valid_mapping_payload()
+        payload["name"] = "Test Mapping"
+
+        response = client.post("/api/v1/mappings/", json=payload)
+        assert response.status_code == 201
+        mapping_id = response.json()["mapping_id"]
+
+        # Simulate server restart
+        from cecil.api.routes import mappings
+
+        mappings._mapping_store.clear()
+        mappings._load_mappings_from_disk()
+
+        # Name should still be present after reload
+        list_resp = client.get("/api/v1/mappings/")
+        assert list_resp.status_code == 200
+        mappings_list = list_resp.json()
+        assert len(mappings_list) == 1
+        assert mappings_list[0]["mapping_id"] == mapping_id
+        assert mappings_list[0]["name"] == "Test Mapping"
+
+    def test_update_mapping_name(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """Updating a mapping can change its name."""
+        # Create a mapping with a name
+        payload = _valid_mapping_payload()
+        payload["name"] = "Original Name"
+
+        response = client.post("/api/v1/mappings/", json=payload)
+        assert response.status_code == 201
+        mapping_id = response.json()["mapping_id"]
+
+        # Update with a new name
+        updated_payload = _valid_mapping_payload()
+        updated_payload["name"] = "Updated Name"
+
+        update_resp = client.put(
+            f"/api/v1/mappings/{mapping_id}",
+            json=updated_payload,
+        )
+        assert update_resp.status_code == 200
+        updated_body = update_resp.json()
+
+        # Name should be updated
+        assert updated_body["name"] == "Updated Name"
+
+        # YAML should reflect the new name
+        yaml_path = mappings_dir / f"{mapping_id}.yaml"
+        with yaml_path.open("r", encoding="utf-8") as f:
+            saved_data = yaml.safe_load(f)
+
+        assert saved_data["name"] == "Updated Name"
+
+
+class TestLoadMappingYamlContent:
+    """Tests for loading mappings from raw YAML content."""
+
+    def test_load_mapping_from_yaml_content(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """A mapping can be loaded from raw YAML content."""
+        yaml_content = """
+version: 1
+default_action: redact
+fields:
+  email:
+    action: mask
+  name:
+    action: redact
+  id:
+    action: keep
+"""
+
+        response = client.post(
+            "/api/v1/mappings/load-yaml-content",
+            json={"content": yaml_content},
+        )
+        assert response.status_code == 201
+        body = response.json()
+
+        # Verify the mapping was loaded correctly
+        assert body["version"] == 1
+        assert body["default_action"] == "redact"
+        assert "email" in body["fields"]
+        assert body["fields"]["email"]["action"] == "mask"
+        assert body["fields"]["name"]["action"] == "redact"
+        assert body["fields"]["id"]["action"] == "keep"
+
+        # A default name should be generated
+        assert "name" in body
+        assert body["name"].startswith("Mapping ")
+
+    def test_load_mapping_from_yaml_content_with_name_in_yaml(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """A mapping loaded from YAML content uses the name from the YAML."""
+        yaml_content = """
+version: 1
+name: YAML Name
+default_action: keep
+fields:
+  user_id:
+    action: hash
+"""
+
+        response = client.post(
+            "/api/v1/mappings/load-yaml-content",
+            json={"content": yaml_content},
+        )
+        assert response.status_code == 201
+        body = response.json()
+
+        # Name from YAML should be used
+        assert body["name"] == "YAML Name"
+
+    def test_load_mapping_from_yaml_content_with_name_in_request(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """A mapping loaded with a name in the request uses that name."""
+        yaml_content = """
+version: 1
+default_action: keep
+fields:
+  user_id:
+    action: hash
+"""
+
+        response = client.post(
+            "/api/v1/mappings/load-yaml-content",
+            json={"content": yaml_content, "name": "Request Name"},
+        )
+        assert response.status_code == 201
+        body = response.json()
+
+        # Name from request should override
+        assert body["name"] == "Request Name"
+
+    def test_load_mapping_from_yaml_content_persists_to_disk(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """A mapping loaded from YAML content is persisted to disk."""
+        yaml_content = """
+version: 1
+name: Content Mapping
+default_action: redact
+fields:
+  email:
+    action: mask
+"""
+
+        response = client.post(
+            "/api/v1/mappings/load-yaml-content",
+            json={"content": yaml_content},
+        )
+        assert response.status_code == 201
+        body = response.json()
+        mapping_id = body["mapping_id"]
+
+        # A YAML file should be created on disk
+        yaml_path = mappings_dir / f"{mapping_id}.yaml"
+        assert yaml_path.is_file()
+
+        with yaml_path.open("r", encoding="utf-8") as f:
+            saved_data = yaml.safe_load(f)
+
+        assert saved_data["version"] == 1
+        assert saved_data["name"] == "Content Mapping"
+        assert saved_data["default_action"] == "redact"
+        assert "email" in saved_data["fields"]
+
+    def test_load_mapping_from_invalid_yaml_content(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """Loading invalid YAML content returns 422."""
+        invalid_yaml = "version: 1\ndefault_action: [invalid"
+
+        response = client.post(
+            "/api/v1/mappings/load-yaml-content",
+            json={"content": invalid_yaml},
+        )
+        assert response.status_code == 422
+        error_body = response.json()
+        assert error_body["error"] == "mapping_parse_error"
+        assert "YAML" in error_body["message"]
+
+    def test_load_mapping_from_yaml_content_missing_fields(
+        self,
+        client: TestClient,
+        mappings_dir: Path,
+    ) -> None:
+        """Loading YAML content without required fields returns 422."""
+        yaml_content = """
+version: 1
+default_action: redact
+"""
+        # Missing 'fields' key
+
+        response = client.post(
+            "/api/v1/mappings/load-yaml-content",
+            json={"content": yaml_content},
+        )
+        assert response.status_code == 422
+        error_body = response.json()
+        assert error_body["error"] == "mapping_parse_error"
