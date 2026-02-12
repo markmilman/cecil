@@ -30,6 +30,9 @@ export function App() {
     if (view === 'dashboard') {
       router.navigate('/');
     } else if (view === 'wizard' || view === 'mapping' || view === 'ingest') {
+      if (view === 'mapping') {
+        setMappingSource(null);
+      }
       router.navigate(`/${view}`);
     }
   }, [router]);
