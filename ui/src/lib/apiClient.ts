@@ -378,6 +378,28 @@ export class ApiClient {
   }
 
   /**
+   * Preview sanitized output records from a file
+   *
+   * @param path - Absolute path to the sanitized output file
+   * @param offset - Record offset for pagination (default: 0)
+   * @param limit - Maximum records to return (default: 50)
+   * @returns Preview response with records, total count, and file path
+   * @throws {ApiClientError} If the preview request fails
+   */
+  async previewOutput(
+    path: string,
+    offset = 0,
+    limit = 50,
+  ): Promise<{ records: Record<string, unknown>[]; total_count: number; path: string }> {
+    const response = await this.client.post<{
+      records: Record<string, unknown>[];
+      total_count: number;
+      path: string;
+    }>('/api/v1/scans/preview-output', { path, offset, limit });
+    return response.data;
+  }
+
+  /**
    * Get the underlying Axios instance for custom requests
    *
    * @returns The configured Axios instance

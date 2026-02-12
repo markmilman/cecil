@@ -7,6 +7,7 @@ interface CompletionViewProps {
   outputPath: string;
   onBackToDashboard: () => void;
   onOpenFolder?: () => void;
+  onViewResults?: () => void;
   onGetReport?: () => void;
   onBack: () => void;
   recordsProcessed?: number;
@@ -26,6 +27,7 @@ export function CompletionView({
   outputPath,
   onBackToDashboard,
   onOpenFolder,
+  onViewResults,
   onGetReport,
   onBack,
   recordsProcessed,
@@ -110,6 +112,7 @@ export function CompletionView({
           <LocalOutputCard
             outputPath={outputPath}
             onOpenFolder={onOpenFolder}
+            onViewResults={onViewResults}
           />
           <CostAnalysisCTA
             onGetReport={onGetReport}

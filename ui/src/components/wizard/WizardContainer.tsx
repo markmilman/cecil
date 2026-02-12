@@ -4,6 +4,7 @@ import { QueuedFiles } from './QueuedFiles';
 import { MappingConfigStep } from './MappingConfigStep';
 import { ProcessingView } from './ProcessingView';
 import { CompletionView } from './CompletionView';
+import { ResultsViewer } from './ResultsViewer';
 import { apiClient } from '@/lib/apiClient';
 
 import type { UploadedFileInfo } from '@/types';
@@ -53,6 +54,7 @@ export function WizardContainer({
     recordsProcessed: number;
     recordsSanitized: number;
   } | null>(null);
+  const [showResultsViewer, setShowResultsViewer] = useState(false);
 
   // When returning from the mapping editor with a mapping ID,
   // resume at step 3 with the mapping pre-loaded
@@ -138,8 +140,17 @@ export function WizardContainer({
     alert('Cost analysis reports coming soon! This feature will allow you to receive detailed cost insights and optimization recommendations.');
   }, []);
 
+  const handleViewResults = useCallback(() => {
+    setShowResultsViewer(true);
+  }, []);
+
+  const handleCloseResultsViewer = useCallback(() => {
+    setShowResultsViewer(false);
+  }, []);
+
   return (
-    <div key={step} className="animate-fade-in">
+    <>
+      <div key={step} className="animate-fade-in">
       {step === 1 && (
         <UploadZone
           onBrowseFiles={handleBrowseFiles}
@@ -182,10 +193,19 @@ export function WizardContainer({
           recordsSanitized={sanitizeResult?.recordsSanitized}
           onBackToDashboard={onBackToDashboard}
           onOpenFolder={handleOpenFolder}
+          onViewResults={handleViewResults}
           onGetReport={handleGetReport}
           onBack={() => onStepChange(3)}
         />
       )}
-    </div>
+      </div>
+
+      {showResultsViewer && sanitizeResult?.outputPath && (
+        <ResultsViewer
+          outputPath={sanitizeResult.outputPath}
+          onClose={handleCloseResultsViewer}
+        />
+      )}
+    </>
   );
 }
