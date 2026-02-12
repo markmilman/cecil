@@ -185,13 +185,15 @@ export class ApiClient {
    * Create a new mapping configuration
    *
    * @param request - Mapping configuration payload
+   * @param name - Optional name for the mapping
    * @returns Created mapping configuration with ID and policy hash
    * @throws {ApiClientError} If the creation fails
    */
-  async createMapping(request: MappingConfigRequest): Promise<MappingConfigResponse> {
+  async createMapping(request: MappingConfigRequest, name?: string): Promise<MappingConfigResponse> {
+    const payload = name ? { ...request, name } : request;
     const response = await this.client.post<MappingConfigResponse>(
       '/api/v1/mappings/',
-      request,
+      payload,
     );
     return response.data;
   }
@@ -311,6 +313,26 @@ export class ApiClient {
     const response = await this.client.post<MappingConfigResponse>(
       '/api/v1/mappings/load-yaml',
       { path },
+    );
+    return response.data;
+  }
+
+  /**
+   * Load a mapping configuration from raw YAML content
+   *
+   * @param content - Raw YAML content string
+   * @param name - Optional name for the mapping
+   * @returns Loaded mapping configuration with ID and policy hash
+   * @throws {ApiClientError} If the load fails
+   */
+  async loadMappingYamlContent(content: string, name?: string): Promise<MappingConfigResponse> {
+    const payload: { content: string; name?: string } = { content };
+    if (name) {
+      payload.name = name;
+    }
+    const response = await this.client.post<MappingConfigResponse>(
+      '/api/v1/mappings/load-yaml-content',
+      payload,
     );
     return response.data;
   }

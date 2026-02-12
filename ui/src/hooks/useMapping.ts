@@ -34,7 +34,7 @@ interface UseMappingReturn extends UseMappingState {
   setDefaultAction: (action: RedactionAction) => void;
   validate: () => Promise<void>;
   preview: () => Promise<void>;
-  save: () => Promise<void>;
+  save: (name?: string) => Promise<void>;
   reset: () => void;
   dismissValidation: () => void;
   dismissPreview: () => void;
@@ -161,21 +161,21 @@ export function useMapping(source?: string): UseMappingReturn {
     }
   }, [state.fields, state.fieldOptions, state.sampleRecord]);
 
-  const save = useCallback(async () => {
+  const save = useCallback(async (name?: string) => {
     setState((prev) => ({ ...prev, isSaving: true, error: null }));
     try {
       const fieldsPayload: Record<string, { action: RedactionAction; options: Record<string, string> }> = {};
-      for (const [name, action] of Object.entries(state.fields)) {
-        fieldsPayload[name] = {
+      for (const [fieldName, action] of Object.entries(state.fields)) {
+        fieldsPayload[fieldName] = {
           action,
-          options: state.fieldOptions[name] || {},
+          options: state.fieldOptions[fieldName] || {},
         };
       }
       const result = await apiClient.createMapping({
         version: 1,
         default_action: state.defaultAction,
         fields: fieldsPayload,
-      });
+      }, name);
       setState((prev) => ({
         ...prev,
         isSaving: false,

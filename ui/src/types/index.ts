@@ -155,6 +155,7 @@ export interface MappingConfigRequest {
   version: number;
   default_action: RedactionAction;
   fields: Record<string, FieldMappingEntry>;
+  name?: string;
 }
 
 /**
@@ -169,6 +170,7 @@ export interface MappingConfigResponse {
   field_count: number;
   created_at: string;
   yaml_path?: string | null;
+  name: string;
 }
 
 /**

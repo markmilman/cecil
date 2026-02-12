@@ -6,8 +6,9 @@
  */
 
 import { useState } from 'react';
-import { EyeIcon, TrashIcon, Loader2Icon, AlertCircleIcon, FileTextIcon } from 'lucide-react';
+import { EyeIcon, TrashIcon, Loader2Icon, AlertCircleIcon, FileTextIcon, FolderOpenIcon } from 'lucide-react';
 import { useMappingList } from '@/hooks/useMappingList';
+import { apiClient } from '@/lib/apiClient';
 
 import type { MappingConfigResponse } from '@/types';
 
@@ -19,8 +20,16 @@ export function SavedMappingsList({ onViewMapping }: SavedMappingsListProps) {
   const { mappings, isLoading, error, deleteMappingById } = useMappingList();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const handleOpenFolder = async () => {
+    try {
+      await apiClient.openDirectory('~/.cecil/mappings/');
+    } catch (err) {
+      alert(`Failed to open folder: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
   const handleDelete = async (mapping: MappingConfigResponse) => {
-    if (!window.confirm(`Delete mapping ${mapping.mapping_id}? This action cannot be undone.`)) {
+    if (!window.confirm(`Delete mapping "${mapping.name}"? This action cannot be undone.`)) {
       return;
     }
 
@@ -66,16 +75,40 @@ export function SavedMappingsList({ onViewMapping }: SavedMappingsListProps) {
 
   return (
     <div>
-      <h2
+      <div
         style={{
-          margin: '0 0 16px',
-          fontSize: '20px',
-          color: 'var(--text-primary)',
-          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px',
         }}
       >
-        Saved Mappings
-      </h2>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: '20px',
+            color: 'var(--text-primary)',
+            fontWeight: 600,
+          }}
+        >
+          Saved Mappings
+        </h2>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={handleOpenFolder}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '13px',
+            padding: '6px 12px',
+          }}
+        >
+          <FolderOpenIcon className="h-4 w-4" />
+          Open Folder
+        </button>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {mappings.map((mapping) => (
@@ -97,7 +130,7 @@ export function SavedMappingsList({ onViewMapping }: SavedMappingsListProps) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  marginBottom: '8px',
+                  marginBottom: '4px',
                 }}
               >
                 <FileTextIcon className="h-5 w-5 text-slate-400" />
@@ -109,7 +142,7 @@ export function SavedMappingsList({ onViewMapping }: SavedMappingsListProps) {
                     color: 'var(--text-primary)',
                   }}
                 >
-                  {mapping.mapping_id}
+                  {mapping.name}
                 </h3>
               </div>
 
@@ -122,6 +155,16 @@ export function SavedMappingsList({ onViewMapping }: SavedMappingsListProps) {
                   color: 'var(--text-secondary)',
                 }}
               >
+                <div
+                  style={{
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                    color: 'var(--text-secondary)',
+                  }}
+                  title={mapping.mapping_id}
+                >
+                  ID: {mapping.mapping_id}
+                </div>
                 <div style={{ display: 'flex', gap: '16px' }}>
                   <span>{Object.keys(mapping.fields).length} field{Object.keys(mapping.fields).length !== 1 ? 's' : ''}</span>
                   <span>Default: {mapping.default_action}</span>
