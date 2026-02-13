@@ -1,26 +1,37 @@
+import type { MouseEvent } from 'react';
+
 /**
  * NavLink component
  *
- * Individual navigation link button with hover/focus state management
- * and support for disabled "Coming soon" links.
+ * Individual navigation link rendered as an <a> tag with href for
+ * proper URL-based routing. Click handler prevents default and
+ * delegates to the onNavigate callback.
  */
 
 interface NavLinkProps {
   view: string;
   label: string;
+  href: string;
   enabled: boolean;
   isActive: boolean;
   onClick: (view: string) => void;
 }
 
-export function NavLink({ view, label, enabled, isActive, onClick }: NavLinkProps) {
+export function NavLink({ view, label, href, enabled, isActive, onClick }: NavLinkProps) {
+  const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    if (enabled) {
+      onClick(view);
+    }
+  };
+
   return (
-    <button
-      type="button"
+    <a
+      href={href}
       role="listitem"
-      onClick={() => enabled && onClick(view)}
-      disabled={!enabled}
-      className="border-none bg-transparent text-sm font-medium transition-colors duration-200"
+      onClick={handleClick}
+      aria-disabled={!enabled || undefined}
+      className="border-none bg-transparent text-sm font-medium no-underline transition-colors duration-200"
       style={{
         color: !enabled
           ? 'var(--text-faint)'
@@ -56,6 +67,6 @@ export function NavLink({ view, label, enabled, isActive, onClick }: NavLinkProp
       title={!enabled ? 'Coming soon' : undefined}
     >
       {label}
-    </button>
+    </a>
   );
 }

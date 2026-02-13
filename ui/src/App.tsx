@@ -6,62 +6,65 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { WizardContainer } from '@/components/wizard/WizardContainer';
 import { MappingPage } from '@/pages/MappingPage';
 import { IngestPage } from '@/pages/IngestPage';
+import { useRouter } from '@/hooks/useRouter';
 
-import type { ActiveView, UploadedFileInfo, WizardStep } from '@/types';
+import type { UploadedFileInfo, WizardStep } from '@/types';
 
 /**
  * Main App component
  *
- * Uses state-driven view switching instead of React Router.
+ * Uses URL-based routing via the History API (useRouter hook).
  * The Shell receives the active view name and an onNavigate callback.
  * Wraps the entire tree in ThemeProvider for light/dark theme support.
  */
 export function App() {
-  const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+  const router = useRouter();
   const [mappingSource, setMappingSource] = useState<string | null>(null);
   const [wizardMappingId, setWizardMappingId] = useState<string | null>(null);
   const [wizardFiles, setWizardFiles] = useState<UploadedFileInfo[]>([]);
   const [wizardStep, setWizardStep] = useState<WizardStep>(1);
-  const [viewMappingId, setViewMappingId] = useState<string | null>(null);
+
+  const activeView = router.view;
 
   const handleNavigate = useCallback((view: string) => {
-    if (view === 'dashboard' || view === 'wizard' || view === 'mapping' || view === 'ingest') {
-      if (view !== 'mapping') {
-        setViewMappingId(null);
+    if (view === 'dashboard') {
+      router.navigate('/');
+    } else if (view === 'wizard' || view === 'mapping' || view === 'ingest') {
+      if (view === 'mapping') {
+        setMappingSource(null);
       }
-      setActiveView(view);
+      router.navigate(`/${view}`);
     }
-  }, []);
+  }, [router]);
 
   const handleViewMapping = useCallback((mappingId: string) => {
-    setViewMappingId(mappingId);
     setMappingSource(null);
-    setActiveView('mapping');
-  }, []);
+    router.navigate(`/mapping/${mappingId}`);
+  }, [router]);
 
   const handleStartWizard = useCallback(() => {
     setWizardFiles([]);
     setWizardStep(1);
     setWizardMappingId(null);
-    setActiveView('wizard');
-  }, []);
+    router.navigate('/wizard');
+  }, [router]);
 
   const handleBackToDashboard = useCallback(() => {
     setWizardFiles([]);
     setWizardStep(1);
     setWizardMappingId(null);
-    setActiveView('dashboard');
-  }, []);
+    router.navigate('/');
+  }, [router]);
 
   const handleConfigureMapping = useCallback((source: string) => {
     setMappingSource(source);
-    setActiveView('mapping');
-  }, []);
+    router.navigate('/mapping');
+  }, [router]);
 
   const handleMappingComplete = useCallback((mappingId: string) => {
     setWizardMappingId(mappingId);
-    setActiveView('wizard');
-  }, []);
+    router.navigate('/wizard');
+  }, [router]);
 
   const handleClearWizardMappingId = useCallback(() => {
     setWizardMappingId(null);
@@ -69,8 +72,16 @@ export function App() {
 
   const handleViewResults = useCallback((source: string, _scanId: string) => {
     setMappingSource(source);
-    setActiveView('mapping');
-  }, []);
+    router.navigate('/mapping');
+  }, [router]);
+
+  const handleJobSelect = useCallback((jobId: string | null) => {
+    if (jobId) {
+      router.replace(`/job/${jobId}`);
+    } else {
+      router.replace('/');
+    }
+  }, [router]);
 
   return (
     <ThemeProvider>
@@ -87,7 +98,12 @@ export function App() {
         >
           <ErrorBoundary key={activeView}>
             {activeView === 'dashboard' && (
-              <DashboardPage onStartWizard={handleStartWizard} onViewMapping={handleViewMapping} />
+              <DashboardPage
+                onStartWizard={handleStartWizard}
+                onViewMapping={handleViewMapping}
+                onJobSelect={handleJobSelect}
+                initialJobId={router.params.jobId}
+              />
             )}
             {activeView === 'wizard' && (
               <WizardContainer
@@ -107,7 +123,7 @@ export function App() {
                 onStartWizard={handleStartWizard}
                 onBackToDashboard={handleBackToDashboard}
                 onMappingComplete={handleMappingComplete}
-                initialMappingId={viewMappingId}
+                initialMappingId={router.params.mappingId}
               />
             )}
             {activeView === 'ingest' && (

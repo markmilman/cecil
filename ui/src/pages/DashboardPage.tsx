@@ -11,6 +11,8 @@ const POLL_INTERVAL_MS = 10_000;
 interface DashboardPageProps {
   onStartWizard: () => void;
   onViewMapping?: (mappingId: string) => void;
+  onJobSelect?: (jobId: string | null) => void;
+  initialJobId?: string | null;
 }
 
 /**
@@ -20,7 +22,7 @@ interface DashboardPageProps {
  * Job" primary button, followed by the stats grid and job history table.
  * Fetches real job data via the useJobList hook with 10-second polling.
  */
-export function DashboardPage({ onStartWizard, onViewMapping }: DashboardPageProps) {
+export function DashboardPage({ onStartWizard, onViewMapping, onJobSelect, initialJobId }: DashboardPageProps) {
   const { jobs, isLoading, error, refresh, deleteJobById } = useJobList();
   const [selectedJob, setSelectedJob] = useState<JobRecord | null>(null);
 
@@ -30,6 +32,15 @@ export function DashboardPage({ onStartWizard, onViewMapping }: DashboardPagePro
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [refresh]);
+
+  // Auto-open drawer when initialJobId is provided (from URL)
+  useEffect(() => {
+    if (!initialJobId || jobs.length === 0) return;
+    const job = jobs.find((j) => j.job_id === initialJobId);
+    if (job) {
+      setSelectedJob(job);
+    }
+  }, [initialJobId, jobs]);
 
   return (
     <div>
@@ -77,12 +88,18 @@ export function DashboardPage({ onStartWizard, onViewMapping }: DashboardPagePro
         isLoading={isLoading}
         error={error}
         onDeleteJob={deleteJobById}
-        onJobClick={setSelectedJob}
+        onJobClick={(job) => {
+          setSelectedJob(job);
+          onJobSelect?.(job.job_id);
+        }}
       />
 
       <JobDetailDrawer
         job={selectedJob}
-        onClose={() => setSelectedJob(null)}
+        onClose={() => {
+          setSelectedJob(null);
+          onJobSelect?.(null);
+        }}
         onViewMapping={onViewMapping ? (mappingId) => {
           setSelectedJob(null);
           onViewMapping(mappingId);
