@@ -17,13 +17,14 @@ interface ShellProps {
 interface NavLinkItem {
   view: string;
   label: string;
+  href: string;
   enabled: boolean;
 }
 
 const NAV_LINKS: NavLinkItem[] = [
-  { view: 'dashboard', label: 'Dashboard', enabled: true },
-  { view: 'mapping', label: 'Mapping Rules', enabled: true },
-  { view: 'settings', label: 'Settings', enabled: false },
+  { view: 'dashboard', label: 'Dashboard', href: '/', enabled: true },
+  { view: 'mapping', label: 'Mapping Rules', href: '/mapping', enabled: true },
+  { view: 'settings', label: 'Settings', href: '/settings', enabled: false },
 ];
 
 /**
@@ -85,6 +86,7 @@ export function Shell({ children, activeView, onNavigate }: ShellProps) {
                 key={link.view}
                 view={link.view}
                 label={link.label}
+                href={link.href}
                 enabled={link.enabled}
                 isActive={activeView === link.view}
                 onClick={onNavigate}

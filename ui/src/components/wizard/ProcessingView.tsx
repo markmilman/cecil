@@ -104,11 +104,20 @@ export function ProcessingView({
           setElapsedSeconds((prev) => prev + 1);
         }, 1000);
 
-        // Connect WebSocket for live progress
-        const port = import.meta.env.VITE_API_PORT || window.location.port || '8000';
+        // Connect WebSocket for live progress.
+        // Must match the host used by apiClient (127.0.0.1 when VITE_API_PORT
+        // is set) to avoid IPv4/IPv6 mismatches on macOS where "localhost"
+        // can resolve to ::1 while FastAPI binds to 127.0.0.1 only.
+        const envPort = import.meta.env.VITE_API_PORT;
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.hostname || '127.0.0.1';
-        const wsUrl = `${protocol}//${host}:${port}/api/v1/scans/${response.scan_id}/ws`;
+        let wsUrl: string;
+        if (envPort) {
+          wsUrl = `ws://127.0.0.1:${envPort}/api/v1/scans/${response.scan_id}/ws`;
+        } else {
+          const host = window.location.hostname || '127.0.0.1';
+          const port = window.location.port || '8000';
+          wsUrl = `${protocol}//${host}:${port}/api/v1/scans/${response.scan_id}/ws`;
+        }
 
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;

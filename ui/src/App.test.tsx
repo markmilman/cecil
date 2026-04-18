@@ -26,7 +26,12 @@ class MockWebSocket {
 }
 
 describe('App wizard reset', () => {
+  const originalPathname = window.location.pathname;
+
   beforeEach(() => {
+    // Start at the root URL so the router renders dashboard
+    window.history.replaceState({}, '', '/');
+
     vi.mocked(apiClient.listJobs).mockResolvedValue([]);
     vi.mocked(apiClient.listMappings).mockResolvedValue([]);
     vi.mocked(apiClient.uploadFiles).mockResolvedValue({
@@ -55,6 +60,7 @@ describe('App wizard reset', () => {
   });
 
   afterEach(() => {
+    window.history.replaceState({}, '', originalPathname);
     vi.clearAllMocks();
   });
 

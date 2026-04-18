@@ -286,12 +286,15 @@ def _execute_sanitize(
     state = _scan_store[scan_id]
     state.status = ScanStatus.RUNNING
 
-    provider = get_provider("local_file", file_path=source, format_hint=file_format.value)
-    strategy = StrictStrategy(config=mapping_config)
-    engine = SanitizationEngine(strategy)
-    writer = JsonlWriter(Path(output_path))
+    writer: JsonlWriter | None = None
+    provider = None
 
     try:
+        provider = get_provider("local_file", file_path=source, format_hint=file_format.value)
+        strategy = StrictStrategy(config=mapping_config)
+        engine = SanitizationEngine(strategy)
+        writer = JsonlWriter(Path(output_path))
+
         provider.connect()
         for sanitized_record in engine.process_stream(provider.stream_records()):
             # Check for cancellation before processing each record.
@@ -338,8 +341,10 @@ def _execute_sanitize(
             extra={"scan_id": scan_id, "error_type": type(err).__name__, "error": str(err)},
         )
     finally:
-        writer.close()
-        provider.close()
+        if writer is not None:
+            writer.close()
+        if provider is not None:
+            provider.close()
 
         # Persist the job record to disk.
         _persist_job(

@@ -569,6 +569,48 @@ class TestSanitize:
         assert record["id"] == 0
         assert "REDACTED" in record["data"]
 
+    def test_sanitize_csv_produces_output_file(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+    ) -> None:
+        """Sanitization of a CSV file produces valid JSONL output."""
+        csv_file = _create_csv_file(tmp_path, records=3)
+        yaml_file = tmp_path / "csv_mapping.yaml"
+        yaml_file.write_text(
+            "version: 1\n"
+            "default_action: redact\n"
+            "fields:\n"
+            "  id:\n"
+            "    action: keep\n"
+            "  name:\n"
+            "    action: redact\n"
+            "  value:\n"
+            "    action: keep\n",
+        )
+        output_dir = tmp_path / "output"
+
+        response = client.post(
+            "/api/v1/scans/sanitize",
+            json={
+                "source": str(csv_file),
+                "mapping_yaml_path": str(yaml_file),
+                "output_dir": str(output_dir),
+            },
+        )
+
+        assert response.status_code == 201
+        output_path = Path(response.json()["output_path"])
+        assert output_path.is_file()
+
+        lines = output_path.read_text(encoding="utf-8").strip().split("\n")
+        assert len(lines) == 3
+        record = json.loads(lines[0])
+        # 'id' and 'value' are KEEP; 'name' is REDACT.
+        assert record["id"] == "0"  # CSV values are strings
+        assert "REDACTED" in record["name"]
+        assert record["value"] == "0"
+
     def test_sanitize_creates_output_directory(
         self,
         client: TestClient,
